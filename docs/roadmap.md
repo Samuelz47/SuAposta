@@ -43,7 +43,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 | Task | Specification | Status |
 | --- | --- | --- |
 | 1.1 Define Docker Compose configuration and environment contract | `tasks/phase-01/01-compose-contract.md` | QA IN REVIEW |
-| 1.2 Provision PostgreSQL with service-owned databases | `tasks/phase-01/02-postgres-databases.md` | PLANNED |
+| 1.2 Provision PostgreSQL with service-owned databases | `tasks/phase-01/02-postgres-databases.md` | DONE |
 | 1.3 Provision RabbitMQ and validate local infrastructure | `tasks/phase-01/03-rabbitmq-and-smoke-check.md` | PLANNED |
 
 ## 4. Phase 2 — Backend foundations
