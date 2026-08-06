@@ -1,0 +1,859 @@
+# API Contracts
+
+## 1. Overview
+
+This document defines the initial REST API contracts for Bet Control SaaS.
+
+The frontend should call the API Gateway.
+
+Internal services should not be called directly by the frontend.
+
+External flow:
+
+```text
+Angular App
+  ↓
+API Gateway
+  ↓
+Auth Service / Betting Service / Analytics Service
+```
+
+Base URL for local development:
+
+```text
+http://localhost:8080
+```
+
+The API Gateway should route requests to internal services.
+
+---
+
+## 2. General API Rules
+
+## 2.1 Content Type
+
+Requests and responses should use JSON.
+
+```http
+Content-Type: application/json
+```
+
+---
+
+## 2.2 Authentication
+
+Protected endpoints require:
+
+```http
+Authorization: Bearer <jwt>
+```
+
+Public endpoints:
+
+```text
+POST /auth/register
+POST /auth/login
+```
+
+Protected endpoints:
+
+```text
+GET /auth/me
+POST /bets
+GET /bets
+GET /bets/{id}
+PUT /bets/{id}
+PATCH /bets/{id}/settle
+GET /analytics/dashboard
+GET /analytics/bets/performance
+```
+
+---
+
+## 2.3 IDs
+
+Use UUID for entity identifiers.
+
+Example:
+
+```json
+{
+  "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19"
+}
+```
+
+---
+
+## 2.4 Dates
+
+Use ISO-8601 date/time format.
+
+Example:
+
+```text
+2026-07-21T22:00:00Z
+```
+
+---
+
+## 2.5 Money and Decimal Values
+
+Use decimal numbers in JSON.
+
+Examples:
+
+```json
+{
+  "stake": 100.00,
+  "odds": 2.10,
+  "profit": 110.00,
+  "roi": 12.50
+}
+```
+
+Backend implementation must use `BigDecimal`.
+
+---
+
+## 2.6 Error Response
+
+Standard error response:
+
+```json
+{
+  "timestamp": "2026-07-21T22:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Stake must be greater than zero",
+  "path": "/bets"
+}
+```
+
+Validation error response:
+
+```json
+{
+  "timestamp": "2026-07-21T22:00:00Z",
+  "status": 400,
+  "error": "Validation Error",
+  "message": "Invalid request fields",
+  "path": "/bets",
+  "fieldErrors": [
+    {
+      "field": "stake",
+      "message": "must be greater than 0"
+    }
+  ]
+}
+```
+
+---
+
+## 3. Auth API
+
+## 3.1 Register User
+
+```http
+POST /auth/register
+```
+
+### Request
+
+```json
+{
+  "name": "Samuel Gomes",
+  "email": "samuel@example.com",
+  "password": "StrongPassword123"
+}
+```
+
+### Response `201 Created`
+
+```json
+{
+  "id": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "name": "Samuel Gomes",
+  "email": "samuel@example.com",
+  "createdAt": "2026-07-21T21:00:00Z"
+}
+```
+
+### Possible errors
+
+```text
+400 Bad Request
+409 Conflict
+```
+
+Conflict example:
+
+```json
+{
+  "timestamp": "2026-07-21T21:00:00Z",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Email already registered",
+  "path": "/auth/register"
+}
+```
+
+---
+
+## 3.2 Login
+
+```http
+POST /auth/login
+```
+
+### Request
+
+```json
+{
+  "email": "samuel@example.com",
+  "password": "StrongPassword123"
+}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "accessToken": "jwt-token",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "user": {
+    "id": "b40da580-a017-4a11-bd42-c67aa6409166",
+    "name": "Samuel Gomes",
+    "email": "samuel@example.com"
+  }
+}
+```
+
+### Possible errors
+
+```text
+400 Bad Request
+401 Unauthorized
+```
+
+---
+
+## 3.3 Current User
+
+```http
+GET /auth/me
+```
+
+### Response `200 OK`
+
+```json
+{
+  "id": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "name": "Samuel Gomes",
+  "email": "samuel@example.com"
+}
+```
+
+### Possible errors
+
+```text
+401 Unauthorized
+```
+
+---
+
+## 4. Betting API
+
+## 4.1 Create Bet
+
+```http
+POST /bets
+```
+
+### Request
+
+```json
+{
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.10,
+  "stake": 100.00,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "notes": "Home win based on recent form"
+}
+```
+
+### Response `201 Created`
+
+```json
+{
+  "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19",
+  "userId": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.10,
+  "stake": 100.00,
+  "status": "PENDING",
+  "profit": null,
+  "returnAmount": null,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "settledAt": null,
+  "notes": "Home win based on recent form",
+  "createdAt": "2026-07-21T21:00:00Z",
+  "updatedAt": "2026-07-21T21:00:00Z"
+}
+```
+
+### Rules
+
+- Requires authentication.
+- `userId` must come from the authenticated user, not from the request body.
+- `stake` must be greater than zero.
+- `odds` must be greater than one.
+- Initial status must be `PENDING`.
+- After successful persistence, Betting Service must publish `BET_CREATED`.
+
+### Possible errors
+
+```text
+400 Bad Request
+401 Unauthorized
+```
+
+---
+
+## 4.2 List Bets
+
+```http
+GET /bets
+```
+
+### Query parameters
+
+```text
+startDate
+endDate
+sport
+league
+team
+market
+status
+minOdds
+maxOdds
+minStake
+maxStake
+page
+size
+sort
+```
+
+Example:
+
+```http
+GET /bets?sport=FOOTBALL&league=Brasileirão%20Série%20A&status=PENDING&page=0&size=20
+```
+
+### Response `200 OK`
+
+```json
+{
+  "content": [
+    {
+      "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19",
+      "sport": "FOOTBALL",
+      "league": "Brasileirão Série A",
+      "homeTeam": "Fortaleza",
+      "awayTeam": "Bahia",
+      "market": "MATCH_RESULT",
+      "selection": "Fortaleza",
+      "odds": 2.10,
+      "stake": 100.00,
+      "status": "PENDING",
+      "profit": null,
+      "returnAmount": null,
+      "placedAt": "2026-07-21T20:30:00Z",
+      "settledAt": null
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Must return only bets from the authenticated user.
+- Pagination should be supported.
+- Filtering should be optional.
+
+---
+
+## 4.3 Get Bet By ID
+
+```http
+GET /bets/{id}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19",
+  "userId": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.10,
+  "stake": 100.00,
+  "status": "PENDING",
+  "profit": null,
+  "returnAmount": null,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "settledAt": null,
+  "notes": "Home win based on recent form",
+  "createdAt": "2026-07-21T21:00:00Z",
+  "updatedAt": "2026-07-21T21:00:00Z"
+}
+```
+
+### Possible errors
+
+```text
+401 Unauthorized
+404 Not Found
+```
+
+---
+
+## 4.4 Update Bet
+
+```http
+PUT /bets/{id}
+```
+
+### Request
+
+```json
+{
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.25,
+  "stake": 120.00,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "notes": "Updated stake and odds"
+}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19",
+  "userId": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.25,
+  "stake": 120.00,
+  "status": "PENDING",
+  "profit": null,
+  "returnAmount": null,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "settledAt": null,
+  "notes": "Updated stake and odds",
+  "createdAt": "2026-07-21T21:00:00Z",
+  "updatedAt": "2026-07-21T21:20:00Z"
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Must update only bets from authenticated user.
+- Only `PENDING` bets can be updated in the first version.
+- After successful persistence, Betting Service must publish `BET_UPDATED`.
+
+### Possible errors
+
+```text
+400 Bad Request
+401 Unauthorized
+404 Not Found
+409 Conflict
+```
+
+---
+
+## 4.5 Settle Bet
+
+```http
+PATCH /bets/{id}/settle
+```
+
+### Request for WON
+
+```json
+{
+  "status": "WON",
+  "settledAt": "2026-07-21T22:00:00Z"
+}
+```
+
+### Request for LOST
+
+```json
+{
+  "status": "LOST",
+  "settledAt": "2026-07-21T22:00:00Z"
+}
+```
+
+### Request for VOID
+
+```json
+{
+  "status": "VOID",
+  "settledAt": "2026-07-21T22:00:00Z"
+}
+```
+
+### Request for CASHOUT
+
+```json
+{
+  "status": "CASHOUT",
+  "returnAmount": 130.00,
+  "settledAt": "2026-07-21T22:00:00Z"
+}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "id": "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19",
+  "userId": "b40da580-a017-4a11-bd42-c67aa6409166",
+  "sport": "FOOTBALL",
+  "league": "Brasileirão Série A",
+  "homeTeam": "Fortaleza",
+  "awayTeam": "Bahia",
+  "market": "MATCH_RESULT",
+  "selection": "Fortaleza",
+  "odds": 2.10,
+  "stake": 100.00,
+  "status": "WON",
+  "profit": 110.00,
+  "returnAmount": 210.00,
+  "placedAt": "2026-07-21T20:30:00Z",
+  "settledAt": "2026-07-21T22:00:00Z",
+  "createdAt": "2026-07-21T21:00:00Z",
+  "updatedAt": "2026-07-21T22:10:00Z"
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Must settle only bets from authenticated user.
+- Only `PENDING` bets can be settled in the first version.
+- Status must be one of:
+
+```text
+WON
+LOST
+VOID
+CASHOUT
+CANCELLED
+```
+
+- For `WON`, profit is calculated automatically.
+- For `LOST`, profit is calculated automatically.
+- For `VOID`, profit is zero.
+- For `CANCELLED`, profit is zero.
+- For `CASHOUT`, return amount must be provided by the user and profit is calculated as `returnAmount - stake`.
+- After successful persistence, Betting Service must publish `BET_SETTLED`.
+
+### Possible errors
+
+```text
+400 Bad Request
+401 Unauthorized
+404 Not Found
+409 Conflict
+```
+
+---
+
+## 5. Analytics API
+
+## 5.1 Dashboard Metrics
+
+```http
+GET /analytics/dashboard
+```
+
+### Query parameters
+
+```text
+startDate
+endDate
+sport
+league
+team
+market
+status
+minOdds
+maxOdds
+minStake
+maxStake
+```
+
+Example:
+
+```http
+GET /analytics/dashboard?startDate=2026-07-01T00:00:00Z&endDate=2026-07-31T23:59:59Z&sport=FOOTBALL
+```
+
+### Response `200 OK`
+
+```json
+{
+  "summary": {
+    "totalStake": 1000.00,
+    "totalProfit": 120.00,
+    "roi": 12.00,
+    "yield": 12.00,
+    "winRate": 55.00,
+    "averageOdds": 2.05,
+    "betsCount": 20,
+    "wonBets": 11,
+    "lostBets": 9,
+    "voidBets": 0,
+    "cashoutBets": 0,
+    "cancelledBets": 0,
+    "maxDrawdown": 180.00,
+    "currentDrawdown": 40.00
+  },
+  "filters": {
+    "startDate": "2026-07-01T00:00:00Z",
+    "endDate": "2026-07-31T23:59:59Z",
+    "sport": "FOOTBALL",
+    "league": null,
+    "team": null,
+    "market": null,
+    "status": null
+  }
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Must return only data from authenticated user.
+- Must read from Analytics Service projection tables.
+- Must not query Betting Service database directly.
+- Pending bets should not affect performance metrics.
+- If there is no data, numeric metrics should return zero.
+
+---
+
+## 5.2 Bankroll Evolution
+
+```http
+GET /analytics/bankroll-evolution
+```
+
+### Query parameters
+
+```text
+startDate
+endDate
+sport
+league
+team
+market
+```
+
+### Response `200 OK`
+
+```json
+{
+  "points": [
+    {
+      "date": "2026-07-01",
+      "profit": 50.00,
+      "cumulativeProfit": 50.00,
+      "bankroll": 1050.00
+    },
+    {
+      "date": "2026-07-02",
+      "profit": -100.00,
+      "cumulativeProfit": -50.00,
+      "bankroll": 950.00
+    }
+  ]
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Data should be ordered by date.
+- Initial version may use cumulative profit if initial bankroll is not implemented yet.
+
+---
+
+## 5.3 Performance Breakdown
+
+```http
+GET /analytics/performance/breakdown
+```
+
+### Query parameters
+
+```text
+groupBy
+startDate
+endDate
+sport
+league
+market
+```
+
+Allowed `groupBy` values:
+
+```text
+SPORT
+LEAGUE
+TEAM
+MARKET
+MONTH
+WEEK
+DAY
+```
+
+Example:
+
+```http
+GET /analytics/performance/breakdown?groupBy=LEAGUE&sport=FOOTBALL
+```
+
+### Response `200 OK`
+
+```json
+{
+  "groupBy": "LEAGUE",
+  "items": [
+    {
+      "name": "Brasileirão Série A",
+      "betsCount": 10,
+      "totalStake": 500.00,
+      "totalProfit": 80.00,
+      "roi": 16.00,
+      "yield": 16.00,
+      "winRate": 60.00
+    },
+    {
+      "name": "Premier League",
+      "betsCount": 8,
+      "totalStake": 400.00,
+      "totalProfit": -20.00,
+      "roi": -5.00,
+      "yield": -5.00,
+      "winRate": 37.50
+    }
+  ]
+}
+```
+
+### Rules
+
+- Requires authentication.
+- Must return only authenticated user data.
+- Must support grouping by common dashboard dimensions.
+- If `groupBy` is invalid, return `400 Bad Request`.
+
+---
+
+## 6. Initial Frontend Routes
+
+The Angular frontend should initially support:
+
+```text
+/login
+/register
+/dashboard
+/bets
+/bets/new
+/bets/:id
+/settings
+```
+
+---
+
+## 7. API Gateway Routing
+
+Initial route mapping:
+
+```text
+/auth/**       -> auth-service
+/bets/**       -> betting-service
+/analytics/**  -> analytics-service
+```
+
+Local suggested ports:
+
+```text
+api-gateway:       8080
+auth-service:      8081
+betting-service:   8082
+analytics-service: 8083
+```
+
+The frontend should call only:
+
+```text
+http://localhost:8080
+```
+
+---
+
+## 8. Contract Change Rules
+
+When changing an API contract:
+
+- Update this file.
+- Update affected request/response DTOs.
+- Update frontend services if needed.
+- Update tests.
+- Avoid breaking changes unless explicitly requested.
+
+Breaking changes include:
+
+- Renaming fields.
+- Removing fields.
+- Changing field types.
+- Changing endpoint paths.
+- Changing authentication requirements.
+- Changing status behavior.
