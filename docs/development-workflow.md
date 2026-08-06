@@ -10,14 +10,16 @@ No agent is authorized to replace a human approval gate.
 
 1. **Small planning:** create or update one task specification in `docs/tasks/` from the template.
 2. **Behavioral specification:** document context, objective, acceptance criteria, boundaries, dependencies, and scope exclusions.
-3. **Human approval of specification:** the task may proceed to tests only after the human approves its behavior.
-4. **Tests in Red:** the test agent adds tests derived from the approved specification and records the Red evidence.
-5. **Human approval of tests:** the human reviews the tests before production implementation begins.
+3. **Specification handoff:** when the human provides the specification, that handoff authorizes the test agent to create tests; the specification remains the source of truth for the behavior.
+4. **Tests in Red:** the test agent adds tests derived from the approved specification, records the Red evidence, and changes the roadmap/task status from `PLANNED` to `TESTS IN REVIEW`.
+5. **Human approval of tests:** after approval, the implementation agent changes the status to `IMPLEMENTATION IN PROGRESS` before production implementation begins.
 6. **Implementation in Green:** the implementation agent changes the smallest necessary production code to satisfy approved tests.
 7. **Refactoring:** improve code only while preserving behavior and keeping the approved suite green.
-8. **Human diff review:** the human reviews the implementation diff and decides whether it may proceed.
-9. **Independent QA audit:** the QA agent uses the original task, criteria, diff, tests, and relevant documents to issue a verdict.
+8. **Human diff review:** the human reviews the implementation diff. After approval, the implementation agent changes the status to `QA IN REVIEW` and may use only `git add -N` for new files so the final QA can inspect them.
+9. **Independent QA audit:** the QA agent uses the original task, criteria, diff, tests, and relevant documents to issue a verdict. After human approval of the QA outcome, it changes the status to `DONE`.
 10. **Corrections, relevant full suite, commit and PR:** resolve blockers, rerun the required suite, then commit only after human approval and a QA approval.
+
+For explicitly authorized direct-implementation tasks, the implementation agent may transition `PLANNED` directly to `QA IN REVIEW` after implementation and human diff approval. It may not use any other shortcut. The implementation agent must never use regular `git add`; `git add -N <new-file>` is the only permitted staging-related command before QA.
 
 ## Input contract per role
 
@@ -32,12 +34,12 @@ Use a separate focused session for each role. Pass artifacts and facts, not priv
 
 ## Human gates
 
-The following transitions require explicit human approval:
+The following transitions require the corresponding human gate:
 
-- specification -> test creation;
+- specification handoff -> test creation;
 - Red tests -> implementation;
 - implementation/refactoring -> final QA;
-- QA approval -> commit/PR;
+- QA approval -> commit/PR and `DONE`;
 - any change to an approved test.
 
 Record the approver, date, and decision in the task file's Status section. Do not infer approval from silence.
@@ -50,13 +52,17 @@ Approved tests represent the accepted behavior. The implementation agent must st
 
 ```text
 PLANNED
-  -> SPECIFICATION APPROVED
   -> TESTS IN REVIEW (Red)
-  -> TESTS APPROVED
-  -> IMPLEMENTATION IN PROGRESS (Green)
-  -> HUMAN DIFF REVIEW
-  -> QA IN REVIEW
-  -> DONE
+  -> IMPLEMENTATION IN PROGRESS (human-approved tests)
+  -> QA IN REVIEW (human-approved implementation diff)
+  -> DONE (QA-approved and human-approved)
+
+Exception, only when the human explicitly directs the implementation agent to skip initial tests:
+
+PLANNED
+  -> QA IN REVIEW (implemented and human-approved diff)
+
+Any divergence blocks the transition: the agent must keep the current status and report the missing evidence or approval.
 ```
 
 `BLOCKED` may be used only with a specific missing decision, dependency, or inconsistency. State what is needed to continue.

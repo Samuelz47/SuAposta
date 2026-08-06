@@ -1,0 +1,9 @@
+name: suaposta
+
+services: {}
+
+networks:
+  suaposta-network:
+    driver: bridge
+
+volumes: {}

@@ -503,6 +503,14 @@ Reviewed documentation
   -> corrections, relevant full suite, commit and PR
 ```
 
+### Roadmap status control
+
+The roadmap status is a strict state machine and must be kept synchronized with the task file. The test agent may change only `PLANNED` -> `TESTS IN REVIEW`, after creating Red tests and recording evidence. After the human approves those tests, the implementation agent may change only `TESTS IN REVIEW` -> `IMPLEMENTATION IN PROGRESS`.
+
+After implementation and explicit human approval of the implementation diff, the implementation agent changes `IMPLEMENTATION IN PROGRESS` -> `QA IN REVIEW`. Before final QA, it may expose newly created files only with `git add -N <new-file>`. It must never run regular `git add`, `git add .`, `git add -A`, commit, or another staging equivalent.
+
+The implementation agent is the only agent allowed to skip a lifecycle stage, and only when the human explicitly requests direct implementation: it may change `PLANNED` -> `QA IN REVIEW` after completing the implementation and receiving human diff approval. No other shortcut is allowed. The QA agent may change only `QA IN REVIEW` -> `DONE`, after the QA verdict is approved by the human. If status, evidence, or approval is inconsistent, the agent must not change the status and must report the divergence.
+
 Responsibilities are intentionally separate:
 
 - The human and documentation define **what the system must do**.
