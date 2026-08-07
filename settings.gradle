@@ -1,0 +1,21 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'suaposta'
+
+include(
+    ':services:api-gateway',
+    ':services:auth-service',
+    ':services:betting-service',
+    ':services:analytics-service'
+)

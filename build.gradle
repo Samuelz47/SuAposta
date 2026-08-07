@@ -1,0 +1,51 @@
+plugins {
+    id 'base'
+}
+
+group = 'com.suaposta'
+version = '0.1.0-SNAPSHOT'
+
+def backendServices = [
+    project(':services:api-gateway'),
+    project(':services:auth-service'),
+    project(':services:betting-service'),
+    project(':services:analytics-service')
+]
+def requestedJavaVersion = providers.gradleProperty('javaVersion')
+    .map { Integer.parseInt(it) }
+    .orElse(21)
+
+configure(backendServices) {
+    apply plugin: 'java'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(requestedJavaVersion.get())
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.release = 21
+        options.encoding = 'UTF-8'
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+
+    tasks.register('verifyJava21') {
+        doLast {
+            def configuredVersion = java.toolchain.languageVersion.get().asInt()
+            if (configuredVersion != 21) {
+                throw new GradleException("${project.path} requires a Java 21 toolchain, but ${configuredVersion} was configured")
+            }
+        }
+    }
+
+    tasks.named('check') {
+        dependsOn('verifyJava21')
+    }
+}

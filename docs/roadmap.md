@@ -50,7 +50,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 
 | Task | Specification | Status |
 | --- | --- | --- |
-| 2.1 Create the Gradle multi-service build foundation | `tasks/phase-02/01-gradle-foundation.md` | PLANNED |
+| 2.1 Create the Gradle multi-service build foundation | `tasks/phase-02/01-gradle-foundation.md` | DONE |
 | 2.2 Bootstrap API Gateway and Auth Service | `tasks/phase-02/02-gateway-and-auth-skeletons.md` | PLANNED |
 | 2.3 Bootstrap Betting and Analytics Services | `tasks/phase-02/03-betting-and-analytics-skeletons.md` | PLANNED |
 
