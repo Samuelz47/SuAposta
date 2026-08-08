@@ -28,18 +28,6 @@ class GatewayHealthIntegrationTest {
         }
     }
 
-    @Test
-    void should_not_expose_business_routes_in_gateway_skeleton() throws Exception {
-        try (var context = ApplicationTestSupport.startApplication()) {
-            var port = ((WebServerApplicationContext) context).getWebServer().getPort();
-
-            assertThat(get(port, "/auth/register").statusCode()).isEqualTo(404);
-            assertThat(get(port, "/auth/login").statusCode()).isEqualTo(404);
-            assertThat(get(port, "/bets").statusCode()).isEqualTo(404);
-            assertThat(get(port, "/analytics/dashboard").statusCode()).isEqualTo(404);
-        }
-    }
-
     private static HttpResponse<String> get(int port, String path) throws Exception {
         var request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + path))
@@ -47,4 +35,5 @@ class GatewayHealthIntegrationTest {
                 .build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     }
+
 }

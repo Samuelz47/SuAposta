@@ -1,6 +1,6 @@
-// Java/Spring foundation only. HTTP behavior is introduced by a later task.
-
 dependencies {
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2024.0.1')
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator:3.4.5'
     implementation 'org.springframework.boot:spring-boot-starter-webflux:3.4.5'
     testImplementation 'org.springframework.boot:spring-boot-starter-test:3.4.5'

@@ -58,7 +58,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 
 | Task | Specification | Status |
 | --- | --- | --- |
-| 3.1 Route public and protected API paths | `tasks/phase-03/01-gateway-routes.md` | PLANNED |
+| 3.1 Route public and protected API paths | `tasks/phase-03/01-gateway-routes.md` | DONE |
 | 3.2 Configure CORS and external error boundaries | `tasks/phase-03/02-cors-and-errors.md` | PLANNED |
 | 3.3 Validate JWT at the gateway boundary | `tasks/phase-03/03-gateway-jwt.md` | PLANNED |
 

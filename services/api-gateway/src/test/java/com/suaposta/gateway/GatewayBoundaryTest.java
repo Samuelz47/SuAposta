@@ -24,18 +24,14 @@ class GatewayBoundaryTest {
     }
 
     @Test
-    void should_not_configure_routes_databases_or_messaging_in_skeleton() {
+    void should_not_configure_databases_or_messaging_in_gateway() {
         var contents = productionFiles().stream()
                 .map(GatewayBoundaryTest::read)
                 .map(value -> value.toLowerCase(Locale.ROOT))
                 .toList();
 
         assertThat(contents)
-                .allMatch(value -> !value.contains("route")
-                        && !value.contains("/auth")
-                        && !value.contains("/bets")
-                        && !value.contains("/analytics")
-                        && !value.contains("datasource")
+                .allMatch(value -> !value.contains("datasource")
                         && !value.contains("jdbc")
                         && !value.contains("postgres")
                         && !value.contains("flyway")
