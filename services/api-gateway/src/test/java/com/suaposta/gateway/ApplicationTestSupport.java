@@ -17,8 +17,17 @@ final class ApplicationTestSupport {
     }
 
     static ConfigurableApplicationContext startApplication() {
-        return new SpringApplicationBuilder(findApplicationClass())
-                .run();
+        var previousSecret = System.getProperty("JWT_SECRET");
+        System.setProperty("JWT_SECRET", "task-3-3-only-signing-secret-32-bytes");
+        try {
+            return new SpringApplicationBuilder(findApplicationClass()).run();
+        } finally {
+            if (previousSecret == null) {
+                System.clearProperty("JWT_SECRET");
+            } else {
+                System.setProperty("JWT_SECRET", previousSecret);
+            }
+        }
     }
 
     private static Class<?> findApplicationClass() {

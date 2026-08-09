@@ -37,6 +37,7 @@ class GatewayCorsAndErrorIntegrationTest {
     private static final int BETTING_SERVICE_PORT = 8082;
     private static final String APPROVED_FRONTEND_ORIGIN = "http://localhost:4200";
     private static final String DISALLOWED_ORIGIN = "https://malicious.example";
+    private static final String VALID_AUTHORIZATION = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBkYTU4MC1hMDE3LTRhMTEtYmQ0Mi1jNjdhYTY0MDkxNjYiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.zBIXoysIys5tveeN8Q_55fOeTMMI9IpcvY-jFHdGmro";
     private static final Path API_CONTRACT = Path.of("..", "..", "docs", "api-contracts.md");
     private static final Pattern HTTP_ENDPOINT = Pattern.compile(
             "(?m)^(GET|POST|PUT|PATCH|DELETE|OPTIONS)\\s+/\\S+.*$");
@@ -68,7 +69,7 @@ class GatewayCorsAndErrorIntegrationTest {
 
     @Test
     void should_return_cors_headers_for_an_approved_frontend_origin_on_a_real_request() throws Exception {
-        var response = get("/bets", APPROVED_FRONTEND_ORIGIN);
+        var response = getProtected("/bets", APPROVED_FRONTEND_ORIGIN);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("Access-Control-Allow-Origin"))
@@ -88,7 +89,7 @@ class GatewayCorsAndErrorIntegrationTest {
                 "X-Upstream-Host", "betting-service:8082",
                 "X-Service-Version", "internal-build-42"));
 
-        var response = get("/bets", APPROVED_FRONTEND_ORIGIN);
+        var response = getProtected("/bets", APPROVED_FRONTEND_ORIGIN);
         var softly = new SoftAssertions();
 
         softly.assertThat(response.statusCode()).isEqualTo(200);
@@ -138,7 +139,7 @@ class GatewayCorsAndErrorIntegrationTest {
 
     @Test
     void should_reject_a_real_request_from_an_unapproved_origin_before_forwarding() throws Exception {
-        var response = get("/bets", DISALLOWED_ORIGIN);
+        var response = getProtected("/bets", DISALLOWED_ORIGIN);
 
         assertThat(BETTING_SERVICE.requests()).isZero();
         assertThat(response.statusCode()).isEqualTo(403);
@@ -197,7 +198,7 @@ class GatewayCorsAndErrorIntegrationTest {
                 }
                 """);
 
-        var response = get("/bets", APPROVED_FRONTEND_ORIGIN);
+        var response = getProtected("/bets", APPROVED_FRONTEND_ORIGIN);
         var body = response.body();
 
         assertThat(response.statusCode()).isBetween(500, 599);
@@ -221,7 +222,7 @@ class GatewayCorsAndErrorIntegrationTest {
         BETTING_SERVICE.respondWith(502,
                 "java.net.ConnectException: password=top-secret at http://betting-service:8082/internal/bets");
 
-        var response = get("/bets", APPROVED_FRONTEND_ORIGIN);
+        var response = getProtected("/bets", APPROVED_FRONTEND_ORIGIN);
         var body = response.body();
 
         assertThat(response.statusCode()).isBetween(500, 599);
@@ -243,7 +244,7 @@ class GatewayCorsAndErrorIntegrationTest {
     void should_return_a_safe_gateway_error_when_upstream_connection_is_unavailable() throws Exception {
         BETTING_SERVICE.respondWithConnectionFailure();
 
-        var response = get("/bets", APPROVED_FRONTEND_ORIGIN);
+        var response = getProtected("/bets", APPROVED_FRONTEND_ORIGIN);
         var body = response.body();
         var softly = new SoftAssertions();
 
@@ -289,11 +290,23 @@ class GatewayCorsAndErrorIntegrationTest {
     }
 
     private static HttpResponse<String> get(String path, String origin) throws Exception {
+        return get(path, origin, null);
+    }
+
+    private static HttpResponse<String> getProtected(String path, String origin) throws Exception {
+        return get(path, origin, VALID_AUTHORIZATION);
+    }
+
+    private static HttpResponse<String> get(String path, String origin, String authorization)
+            throws Exception {
         var builder = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + GATEWAY_PORT + path))
                 .GET();
         if (origin != null) {
             builder.header("Origin", origin);
+        }
+        if (authorization != null) {
+            builder.header("Authorization", authorization);
         }
         return send(builder.build());
     }

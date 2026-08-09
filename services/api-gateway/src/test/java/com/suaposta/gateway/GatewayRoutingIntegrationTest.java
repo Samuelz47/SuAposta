@@ -25,6 +25,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 class GatewayRoutingIntegrationTest {
 
     private static final int GATEWAY_PORT = 8080;
+    private static final String VALID_AUTHORIZATION = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBkYTU4MC1hMDE3LTRhMTEtYmQ0Mi1jNjdhYTY0MDkxNjYiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.zBIXoysIys5tveeN8Q_55fOeTMMI9IpcvY-jFHdGmro";
     private static final Map<String, Integer> SERVICE_PORTS = Map.of(
             "auth", 8081,
             "betting", 8082,
@@ -73,7 +74,7 @@ class GatewayRoutingIntegrationTest {
 
     @Test
     void should_route_bets_paths_only_to_betting_service_when_frontend_calls_gateway() throws Exception {
-        var response = get("/bets?status=PENDING");
+        var response = get("/bets?status=PENDING", VALID_AUTHORIZATION);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("BETTING_SERVICE").contains("/bets");
@@ -84,7 +85,7 @@ class GatewayRoutingIntegrationTest {
 
     @Test
     void should_route_analytics_paths_only_to_analytics_service_when_frontend_calls_gateway() throws Exception {
-        var response = get("/analytics/dashboard");
+        var response = get("/analytics/dashboard", VALID_AUTHORIZATION);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("ANALYTICS_SERVICE").contains("/analytics/dashboard");
@@ -125,10 +126,17 @@ class GatewayRoutingIntegrationTest {
     }
 
     private static HttpResponse<String> get(String path) throws Exception {
-        return send(HttpRequest.newBuilder()
+        return get(path, null);
+    }
+
+    private static HttpResponse<String> get(String path, String authorization) throws Exception {
+        var builder = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + GATEWAY_PORT + path))
-                .GET()
-                .build());
+                .GET();
+        if (authorization != null) {
+            builder.header("Authorization", authorization);
+        }
+        return send(builder.build());
     }
 
     private static HttpResponse<String> post(String path) throws Exception {

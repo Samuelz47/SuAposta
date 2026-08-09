@@ -68,6 +68,44 @@ GET /analytics/dashboard
 GET /analytics/bets/performance
 ```
 
+### JWT access token contract
+
+Access tokens issued by the Auth Service and validated by the API Gateway must follow this initial contract:
+
+- JWT signing algorithm: `HS256`.
+- The signing secret must be provided through configuration/environment variables.
+- The signing secret must never be hardcoded in production code or committed to the repository.
+- The Auth Service and API Gateway must use the same signing contract.
+- Required claims:
+    - `sub`: authenticated user identifier.
+    - `iat`: token issuance timestamp.
+    - `exp`: token expiration timestamp.
+- `sub` must contain the stable UUID of the authenticated user.
+- Passwords, password hashes, credentials, or other sensitive authentication data must never be included in JWT claims.
+- Tokens with an invalid signature, invalid format, or expired `exp` must be rejected with `401 Unauthorized`.
+
+### Gateway authenticated identity contract
+
+After successfully validating a JWT on a protected route:
+
+- The API Gateway must use the `sub` claim as the authenticated user identity.
+- The Gateway must propagate only the required authenticated identity to downstream services using:
+
+```http
+X-User-Id: <authenticated-user-uuid>
+```
+
+- The original `Authorization` header containing the Bearer JWT must be removed before forwarding the request downstream.
+- JWT claims that are not part of the documented downstream identity contract must not be converted into internal headers.
+- Authentication at the Gateway establishes authenticated identity only.
+- Resource ownership and service-level authorization must be enforced by the responsible downstream service.
+
+Requests to protected endpoints with missing, malformed, expired, or invalid JWTs must return:
+
+```text
+401 Unauthorized
+```
+
 ---
 
 ## 2.3 IDs
