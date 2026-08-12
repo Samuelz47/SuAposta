@@ -1,6 +1,7 @@
 package com.suaposta.auth.presentation.exception;
 
 import com.suaposta.auth.domain.exception.DuplicateEmailException;
+import com.suaposta.auth.domain.exception.InvalidCredentialsException;
 import com.suaposta.auth.presentation.dto.ApiErrorResponse;
 import com.suaposta.auth.presentation.dto.FieldErrorResponse;
 import com.suaposta.auth.presentation.dto.ValidationErrorResponse;
@@ -45,5 +46,18 @@ public class AuthExceptionHandler {
                 exception.getMessage(),
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
+            InvalidCredentialsException exception,
+            HttpServletRequest request) {
+        var response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 }

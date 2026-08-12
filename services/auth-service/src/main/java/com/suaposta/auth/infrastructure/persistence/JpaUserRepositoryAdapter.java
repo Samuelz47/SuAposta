@@ -5,6 +5,7 @@ import com.suaposta.auth.domain.exception.DuplicateEmailException;
 import com.suaposta.auth.domain.model.User;
 import com.suaposta.auth.domain.repository.UserRepository;
 import java.sql.SQLException;
+import java.util.Optional;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,11 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     @Override
     public boolean existsByEmail(String email) {
         return repository.existsByEmail(email);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return repository.findByEmail(email).map(UserEntity::toDomain);
     }
 
     @Override
