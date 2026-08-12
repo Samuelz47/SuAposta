@@ -60,13 +60,13 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 | --- | --- | --- |
 | 3.1 Route public and protected API paths | `tasks/phase-03/01-gateway-routes.md` | DONE |
 | 3.2 Configure CORS and external error boundaries | `tasks/phase-03/02-cors-and-errors.md` | DONE |
-| 3.3 Validate JWT at the gateway boundary | `tasks/phase-03/03-gateway-jwt.md` | QA IN REVIEW |
+| 3.3 Validate JWT at the gateway boundary | `tasks/phase-03/03-gateway-jwt.md` | DONE |
 
 ## 6. Phase 4 — Auth Service MVP
 
 | Task | Specification | Status |
 | --- | --- | --- |
-| 4.1 Register a user | `tasks/phase-04/01-register-user.md` | PLANNED |
+| 4.1 Register a user | `tasks/phase-04/01-register-user.md` | DONE |
 | 4.2 Authenticate a user and issue a JWT | `tasks/phase-04/02-login-and-jwt.md` | PLANNED |
 | 4.3 Identify the authenticated user | `tasks/phase-04/03-current-user.md` | PLANNED |
 
