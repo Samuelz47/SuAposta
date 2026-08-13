@@ -6,6 +6,7 @@ import com.suaposta.auth.domain.model.User;
 import com.suaposta.auth.domain.repository.UserRepository;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -28,6 +29,11 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     @Override
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(UserEntity::toDomain);
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        return repository.findById(id).map(UserEntity::toDomain);
     }
 
     @Override

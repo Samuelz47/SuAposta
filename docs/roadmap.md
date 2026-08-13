@@ -68,7 +68,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 | --- | --- | --- |
 | 4.1 Register a user | `tasks/phase-04/01-register-user.md` | DONE |
 | 4.2 Authenticate a user and issue a JWT | `tasks/phase-04/02-login-and-jwt.md` | DONE |
-| 4.3 Identify the authenticated user | `tasks/phase-04/03-current-user.md` | PLANNED |
+| 4.3 Identify the authenticated user | `tasks/phase-04/03-current-user.md` | DONE |
 
 ## 7. Phase 5 — Betting Service MVP
 
