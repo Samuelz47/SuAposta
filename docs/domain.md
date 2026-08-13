@@ -1,303 +1,129 @@
-# Domain
+### Decimal precision
 
-## 1. Overview
+Financial calculations must use `BigDecimal`.
 
-This document defines the core business domain for Bet Control SaaS.
+- Monetary values use scale `2`.
+- Odds use scale `4`.
+- Monetary calculation results use scale `2`.
+- Rounding mode is `HALF_UP`.
+- `double` and `float` must never be used for stake, odds, profit, return amount, or intermediate financial calculations.
 
-The platform helps users register sports bets, manage their bankroll, and analyze performance through metrics such as profit, ROI, yield, win rate, and drawdown.
+Input values may contain fewer decimal places and are normalized to the documented scale.
 
-The first version should keep the domain simple and focused. The goal is to build a clear foundation before adding advanced features such as sportsbook integrations, automatic odds import, catalogs, subscriptions, or AI recommendations.
-
----
-
-## 2. Core Domain Concepts
-
-## 2.1 User
-
-A user is a person who uses the platform to manage bets and analyze performance.
-
-The Auth Service owns user identity.
-
-Initial user data:
-
-```text
-id
-name
-email
-passwordHash
-role
-createdAt
-updatedAt
-```
-
-Rules:
-
-- Email must be unique.
-- Password must be stored as a hash.
-- Password must never be exposed through APIs or events.
-- Other services should reference users by `userId`.
-
----
-
-## 2.2 Bankroll
-
-Bankroll is the amount of money the user uses as betting capital.
-
-The first version may calculate bankroll evolution from settled bets.
-
-Initial approach:
-
-```text
-currentBankroll = initialBankroll + totalProfit
-```
-
-The first MVP may store `initialBankroll` in user settings or analytics settings later.
-
-For the first implementation, bankroll can be simplified and calculated mainly through profit history.
-
-Future improvements:
-
-- Bankroll deposits.
-- Bankroll withdrawals.
-- Multiple bankrolls.
-- Bankroll reset.
-- Bankroll history table.
-- Bankroll by bookmaker.
-
----
-
-## 2.3 Bet
-
-A bet is a sports betting operation registered by the user.
-
-The Betting Service owns the bet lifecycle.
-
-Initial bet fields:
-
-```text
-id
-userId
-sport
-league
-homeTeam
-awayTeam
-market
-selection
-odds
-stake
-status
-profit
-returnAmount
-placedAt
-settledAt
-notes
-createdAt
-updatedAt
-```
-
-Rules:
-
-- A bet must belong to one user.
-- A bet must have positive stake.
-- A bet must have odds greater than 1.
-- A bet must start as `PENDING`.
-- A pending bet may be updated.
-- A pending bet may be settled.
-- A settled bet should not be settled again unless a correction flow is explicitly created.
-- Pending bets should not affect profit, ROI, yield, or drawdown calculations.
-- Settled bets should affect analytics according to their final status.
-
----
-
-## 2.4 Sport
-
-Sport represents the sport related to the bet.
+Values requiring more precision than the documented scale are rounded using `HALF_UP`.
 
 Examples:
 
 ```text
-FOOTBALL
-BASKETBALL
-TENNIS
-VOLLEYBALL
-BASEBALL
-MMA
-OTHER
+Stake: 100      -> 100.00
+Stake: 25.5     -> 25.50
+
+Odds: 2.1       -> 2.1000
+Odds: 1.85555   -> 1.8556
+
+The invariant must be enforced when the value object is created.
+
+Invalid examples:
+
+```text
+0
+0.00
+-0.01
+-100
 ```
 
-Initial recommendation:
+### Odds
 
-Use an enum or string in the Betting Service.
+Odds represent the decimal multiplier used by a won bet.
 
-Do not create a dedicated Sport Catalog Service in the first version.
+Rules:
 
----
-
-## 2.5 League
-
-League represents the competition related to the bet.
+* must use `BigDecimal`;
+* must be strictly greater than `1`;
+* scale is `4`;
+* values are normalized using `RoundingMode.HALF_UP`;
+* `double` and `float` must not be used.
 
 Examples:
 
 ```text
-Brasileirão Série A
-Premier League
-Champions League
-NBA
-ATP Wimbledon
-UFC
+2.1     -> 2.1000
+1.85    -> 1.8500
+2.12555 -> 2.1256
 ```
 
-Initial recommendation:
+The invariant must be enforced when the value object is created.
 
-Use a string.
-
-Do not normalize leagues into a separate table in the first version unless explicitly requested.
-
----
-
-## 2.6 Team
-
-Team represents one of the teams or participants involved in the bet.
-
-Initial fields on Bet:
+Invalid examples:
 
 ```text
-homeTeam
-awayTeam
+1
+1.0000
+0.99
+0
+-1
 ```
+
+## Financial precision contract
+
+All financial domain calculations must use `BigDecimal`.
+
+### Money
+
+Applies to:
+
+* stake;
+* profit;
+* return amount;
+* cashout return amount.
 
 Rules:
 
-- Team fields may be optional for sports where the concept does not apply.
-- For tennis, MMA, or individual sports, `homeTeam` and `awayTeam` may represent participants.
-- Team normalization is out of scope for the first version.
-
----
-
-## 2.7 Market
-
-Market represents the type of bet.
-
-Examples:
-
 ```text
-MATCH_RESULT
-OVER_UNDER
-BOTH_TEAMS_TO_SCORE
-HANDICAP
-DOUBLE_CHANCE
-CORRECT_SCORE
-PLAYER_PROPS
-OTHER
+scale = 2
+rounding = HALF_UP
 ```
 
-Initial recommendation:
+### Odds
 
-Use an enum or string.
-
-Keep the implementation flexible enough to support new markets later.
-
----
-
-## 2.8 Selection
-
-Selection is the specific outcome chosen by the user.
-
-Examples:
+Rules:
 
 ```text
-Fortaleza
-Over 2.5
-Both teams to score: Yes
-Home -1.5
-Draw
+scale = 4
+rounding = HALF_UP
 ```
 
-Rules:
+### Settlement calculations
 
-- Selection should be stored as text in the first version.
-- The system should not validate whether the selection exists in an external sportsbook.
-- External sportsbook validation is out of scope.
+Intermediate calculations must remain `BigDecimal`.
 
----
-
-## 2.9 Odds
-
-Odds represent the multiplier used to calculate the return of a won bet.
-
-Rules:
-
-- Odds must be greater than 1.
-- Odds must use decimal format.
-- Odds must be stored with `BigDecimal`.
-- Do not use `double` or `float`.
-
-Example:
+Final monetary results must be normalized to:
 
 ```text
-2.10
-1.85
-3.50
+scale = 2
+rounding = HALF_UP
 ```
 
----
+`double` and `float` must not participate in financial calculations.
 
-## 2.10 Stake
+## Bet initial state
 
-Stake is the amount of money risked in the bet.
-
-Rules:
-
-- Stake must be greater than 0.
-- Stake must use `BigDecimal`.
-- Do not use `double` or `float`.
-
-Example:
+A newly created valid Bet must start as:
 
 ```text
-100.00
-25.50
-10.00
+status = PENDING
+profit = null
+returnAmount = null
+settledAt = null
 ```
 
----
+A pending Bet has not yet produced a financial result.
 
-## 2.11 Profit
+## Settlement statuses
 
-Profit is the net financial result of a bet.
-
-Rules:
-
-- Profit is null while a bet is pending.
-- Won bets generate positive profit.
-- Lost bets generate negative profit.
-- Void bets generate zero profit.
-- Cancelled bets generate zero profit.
-- Cashout bets use custom profit informed by the user.
-
----
-
-## 2.12 Return Amount
-
-Return amount is the total amount returned to the user after settlement.
-
-Rules:
-
-- Won bet return amount is `stake * odds`.
-- Lost bet return amount is `0`.
-- Void bet return amount is `stake`.
-- Cancelled bet return amount is `stake`.
-- Cashout return amount is `stake + profit`.
-
----
-
-## 3. Bet Status
-
-Initial statuses:
+The final statuses supported by the first version are:
 
 ```text
-PENDING
 WON
 LOST
 VOID
@@ -305,127 +131,149 @@ CASHOUT
 CANCELLED
 ```
 
-## 3.1 PENDING
-
-The bet was created but has not been resolved.
-
-Rules:
-
-- Can be updated.
-- Can be settled.
-- Should not count toward profit metrics.
-- Should not count toward ROI.
-- Should not count toward yield.
-- Should not count toward win rate.
-- Should not count toward drawdown.
-
----
-
-## 3.2 WON
-
-The bet was successful.
-
-Rules:
+Only a Bet whose current status is:
 
 ```text
-profit = stake * (odds - 1)
-returnAmount = stake * odds
+PENDING
 ```
+
+may transition to one of these final statuses.
+
+## Settlement calculation contract
+
+### WON
+
+A won Bet calculates:
+
+```text
+returnAmount = stake × odds
+profit = returnAmount − stake
+```
+
+Equivalent profit formula:
+
+```text
+profit = stake × (odds − 1)
+```
+
+Final `returnAmount` and `profit` use monetary scale `2` and `HALF_UP`.
 
 Example:
 
 ```text
-stake = 100
-odds = 2.10
-profit = 110
-returnAmount = 210
+stake = 100.00
+odds = 2.1000
+
+returnAmount = 210.00
+profit = 110.00
 ```
 
----
+### LOST
 
-## 3.3 LOST
-
-The bet was unsuccessful.
-
-Rules:
+A lost Bet calculates:
 
 ```text
+returnAmount = 0.00
 profit = -stake
-returnAmount = 0
 ```
 
 Example:
 
 ```text
-stake = 100
-profit = -100
-returnAmount = 0
+stake = 100.00
+
+returnAmount = 0.00
+profit = -100.00
 ```
 
----
+### VOID
 
-## 3.4 VOID
-
-The bet was voided and stake was returned.
-
-Rules:
+A void Bet returns the original stake:
 
 ```text
-profit = 0
 returnAmount = stake
+profit = 0.00
 ```
 
-Void bets should not count as wins or losses.
-
----
-
-## 3.5 CASHOUT
-
-The user closed the bet before the final result.
-
-Rules:
+Example:
 
 ```text
-returnAmount = cashout value informed by user
-profit = returnAmount - stake
+stake = 100.00
+
+returnAmount = 100.00
+profit = 0.00
 ```
 
-Cashout may be positive or negative.
+### CANCELLED
 
-Examples:
-
-```text
-stake = 100
-returnAmount = 130
-profit = 30
-```
+A cancelled Bet returns the original stake:
 
 ```text
-stake = 100
-returnAmount = 80
-profit = -20
-```
-
----
-
-## 3.6 CANCELLED
-
-The bet was cancelled by the user or by system decision.
-
-Rules:
-
-```text
-profit = 0
 returnAmount = stake
+profit = 0.00
 ```
 
-Cancelled bets should generally not affect performance metrics.
+Example:
 
----
+```text
+stake = 100.00
 
-## 4. Bet Lifecycle
+returnAmount = 100.00
+profit = 0.00
+```
 
-Initial lifecycle:
+### CASHOUT
+
+For CASHOUT, the user informs the return amount.
+
+The domain derives profit:
+
+```text
+returnAmount = cashoutReturn
+profit = cashoutReturn − stake
+```
+
+Example with positive result:
+
+```text
+stake = 100.00
+cashoutReturn = 130.00
+
+returnAmount = 130.00
+profit = 30.00
+```
+
+Example with negative result:
+
+```text
+stake = 100.00
+cashoutReturn = 80.00
+
+returnAmount = 80.00
+profit = -20.00
+```
+
+CASHOUT may therefore produce:
+
+* positive profit;
+* zero profit;
+* negative profit.
+
+A CASHOUT settlement requires an explicit return amount.
+
+A missing CASHOUT return amount must be rejected by the domain.
+
+The user does not directly inform `profit`; the domain always derives it from:
+
+```text
+cashoutReturn − stake
+```
+
+Do not introduce additional CASHOUT restrictions unless explicitly documented.
+
+## Lifecycle rules
+
+Allowed transitions:
 
 ```text
 PENDING -> WON
@@ -435,7 +283,11 @@ PENDING -> CASHOUT
 PENDING -> CANCELLED
 ```
 
-Not allowed in the first version:
+A Bet already in any final state is settled.
+
+A settled Bet cannot be settled again.
+
+Examples of forbidden behavior:
 
 ```text
 WON -> LOST
@@ -445,259 +297,178 @@ CASHOUT -> WON
 CANCELLED -> WON
 ```
 
-Future improvement:
-
-Create a correction flow for wrong settlements.
-
-Possible future statuses:
-
-```text
-CORRECTED
-REOPENED
-DELETED
-ARCHIVED
-```
-
-These are out of scope for the first version.
-
----
-
-## 5. Business Metrics
-
-## 5.1 Total Stake
-
-Total amount risked in settled bets.
-
-Formula:
-
-```text
-totalStake = sum(stake) for settled bets
-```
-
-Pending bets should be excluded.
-
-Void and cancelled bets may be excluded from performance calculations depending on the report.
-
-Initial recommendation:
-
-- Include WON, LOST, and CASHOUT in performance metrics.
-- Exclude PENDING, VOID, and CANCELLED from ROI, yield, and win rate.
-
----
-
-## 5.2 Total Profit
-
-Total net result.
-
-Formula:
-
-```text
-totalProfit = sum(profit) for settled performance bets
-```
-
-Initial performance statuses:
-
-```text
-WON
-LOST
-CASHOUT
-```
-
----
-
-## 5.3 ROI
-
-Return on investment.
-
-Formula:
-
-```text
-ROI = (totalProfit / totalStake) * 100
-```
-
-Rules:
-
-- Use only settled performance bets.
-- If totalStake is zero, ROI should be zero or null according to API contract.
-- Initial recommendation: return zero when totalStake is zero.
-
----
-
-## 5.4 Yield
-
-Yield represents betting efficiency.
-
-Formula:
-
-```text
-Yield = (totalProfit / totalStake) * 100
-```
-
-For the first version, ROI and Yield may use the same formula.
-
-Future improvement:
-
-- ROI may be based on bankroll allocation.
-- Yield may remain based on betting turnover.
-
----
-
-## 5.5 Win Rate
-
-Percentage of resolved bets that were won.
-
-Formula:
-
-```text
-winRate = (wonBets / totalWinLossBets) * 100
-```
-
-Rules:
-
-- WON counts as win.
-- LOST counts as loss.
-- CASHOUT may be excluded from win rate in the first version.
-- VOID and CANCELLED should be excluded.
-- PENDING should be excluded.
-
----
-
-## 5.6 Average Odds
-
-Average odds of included bets.
-
-Formula:
-
-```text
-averageOdds = sum(odds) / betsCount
-```
-
-Rules:
-
-- Can be calculated for all bets or filtered bets.
-- Dashboard should define whether it includes pending bets.
-- Initial recommendation: include only settled performance bets.
-
----
-
-## 5.7 Drawdown
-
-Drawdown measures the decline from a previous bankroll peak.
-
-Algorithm:
-
-```text
-currentBankroll = initialBankroll
-peak = initialBankroll
-maxDrawdown = 0
-
-for each settled performance bet ordered by settledAt:
-    currentBankroll = currentBankroll + profit
-
-    if currentBankroll > peak:
-        peak = currentBankroll
-
-    drawdown = peak - currentBankroll
-
-    if drawdown > maxDrawdown:
-        maxDrawdown = drawdown
-```
-
-Drawdown percentage:
-
-```text
-drawdownPercentage = (drawdown / peak) * 100
-```
-
-Initial recommendation:
-
-- Use only WON, LOST, and CASHOUT bets.
-- Order by `settledAt`.
-- If no initial bankroll exists, use zero-based profit curve for first MVP.
-
----
-
-## 6. Dashboard Filters
-
-Initial filters:
-
-```text
-startDate
-endDate
-sport
-league
-team
-market
-status
-minOdds
-maxOdds
-minStake
-maxStake
-```
-
-Rules:
-
-- Filters should be optional.
-- Date range should filter by `placedAt` or `settledAt` depending on endpoint purpose.
-- Dashboard metrics should preferably use `settledAt` because metrics depend on resolved results.
-- Bet listing may use `placedAt`.
-
----
-
-## 7. MVP Domain Scope
-
-The first MVP should include:
-
-- User registration.
-- User login.
-- JWT authentication.
-- Bet creation.
-- Bet update while pending.
-- Bet listing.
-- Bet settlement.
-- Bet-level profit calculation.
-- Event publishing after bet creation, update, and settlement.
-- Analytics projection update through events.
-- Dashboard metrics with basic filters.
-
----
-
-## 8. Out of Scope for First Version
-
-Do not implement these unless explicitly requested:
-
-- External sportsbook integration.
-- Real odds import.
-- Betting recommendations.
-- AI prediction engine.
-- Payment subscriptions.
-- Multi-tenant organizations.
-- Team catalog.
-- League catalog.
-- Sport catalog microservice.
-- Multiple bankrolls.
-- Bookmaker management.
-- Bet slip grouping.
-- Parlay/multiple bets.
-- Arbitrage calculations.
-- Surebet calculations.
-- Kelly criterion.
-- Unit staking plans.
-- Social features.
-- Public leaderboards.
-
----
-
-## 9. Domain Implementation Guidelines
-
-Backend agents must:
-
-- Keep business rules in the domain layer when possible.
-- Keep orchestration in the application layer.
-- Keep persistence details in the infrastructure layer.
-- Keep controllers thin.
-- Use `BigDecimal` for financial values.
-- Avoid `double` and `float` for money and odds.
-- Add tests for profit calculation and bet lifecycle rules.
-- Avoid normalizing sport, league, team, and market too early.
-- Avoid creating catalog services in the first version.
+A repeated settlement attempt must:
+
+* be rejected by the domain;
+* preserve the existing final status;
+* preserve the existing profit;
+* preserve the existing return amount;
+* not partially mutate the Bet before failure.
+
+Correction and reopening flows are outside this task.
+
+## Acceptance criteria
+
+* [ ] Stake uses `BigDecimal`.
+* [ ] Stake must be strictly greater than zero.
+* [ ] Stake is normalized to monetary scale `2` with `HALF_UP`.
+* [ ] Odds uses `BigDecimal`.
+* [ ] Odds must be strictly greater than one.
+* [ ] Odds is normalized to scale `4` with `HALF_UP`.
+* [ ] `double` and `float` are not used for financial domain calculations.
+* [ ] A new Bet starts as `PENDING`.
+* [ ] A new pending Bet has `profit = null`.
+* [ ] A new pending Bet has `returnAmount = null`.
+* [ ] A new pending Bet has `settledAt = null`.
+* [ ] WON profit is `stake × odds − stake`.
+* [ ] WON return amount is `stake × odds`.
+* [ ] LOST profit is `−stake`.
+* [ ] LOST return amount is zero.
+* [ ] VOID profit is zero.
+* [ ] VOID return amount equals stake.
+* [ ] CANCELLED profit is zero.
+* [ ] CANCELLED return amount equals stake.
+* [ ] CASHOUT uses an explicitly informed return amount.
+* [ ] CASHOUT profit is calculated as `cashoutReturn − stake`.
+* [ ] CASHOUT without return amount is rejected.
+* [ ] Final monetary values use scale `2` and `HALF_UP`.
+* [ ] Only `PENDING` bets may settle.
+* [ ] Each documented final status is reachable from `PENDING`.
+* [ ] A settled Bet cannot settle again.
+* [ ] Failed repeated settlement does not modify the previous settlement result.
+
+## Boundary and negative cases
+
+Tests must cover at least:
+
+### Stake
+
+* positive integer value;
+* positive decimal value;
+* value requiring rounding;
+* zero;
+* negative value.
+
+### Odds
+
+* value greater than one;
+* decimal value;
+* value requiring rounding;
+* exactly one;
+* below one;
+* zero;
+* negative value.
+
+### WON
+
+* normal calculation;
+* decimal stake;
+* decimal odds;
+* calculation requiring monetary rounding.
+
+### LOST
+
+* negative profit;
+* zero return amount.
+
+### VOID
+
+* zero profit;
+* stake returned.
+
+### CANCELLED
+
+* zero profit;
+* stake returned.
+
+### CASHOUT
+
+* positive profit;
+* negative profit;
+* zero profit;
+* return amount requiring monetary rounding;
+* missing return amount.
+
+### Lifecycle
+
+* `PENDING -> WON`;
+* `PENDING -> LOST`;
+* `PENDING -> VOID`;
+* `PENDING -> CASHOUT`;
+* `PENDING -> CANCELLED`;
+* repeated settlement from every final status.
+
+## Domain purity
+
+All behavior in this task must remain inside the domain layer.
+
+Tests must not require:
+
+* Spring Context;
+* controllers;
+* Bean Validation;
+* HTTP;
+* repositories;
+* JPA;
+* databases;
+* Testcontainers;
+* RabbitMQ;
+* external services;
+* mocks.
+
+Domain tests must be deterministic and execute without infrastructure.
+
+## Out of scope
+
+* Repositories.
+* JPA entities.
+* Database migrations.
+* HTTP APIs.
+* DTOs.
+* Authentication.
+* Ownership authorization.
+* Bet creation API.
+* Bet listing.
+* Bet retrieval.
+* Bet update API.
+* RabbitMQ.
+* Domain event publishing.
+* Analytics aggregation.
+* Settlement correction.
+* Reopening settled bets.
+
+## Dependencies
+
+* Phase 2 Betting Service skeleton.
+* `docs/domain.md`.
+
+Task 5.2 depends on the domain behavior established here.
+
+## Expected tests
+
+Pure domain unit tests, without mocks, covering:
+
+* Stake invariants;
+* Odds invariants;
+* decimal normalization;
+* rounding;
+* initial Bet state;
+* WON settlement;
+* LOST settlement;
+* VOID settlement;
+* CANCELLED settlement;
+* CASHOUT settlement;
+* missing CASHOUT return;
+* every valid lifecycle transition;
+* repeated settlement protection;
+* preservation of state after rejected settlement.
+
+Tests should initially be Red because the Task 5.1 domain implementation does not yet exist.
+
+## Definition of Done
+
+Apply `docs/definition-of-done.md`.
+
+## Status and evidence
+
+Use the status table from `docs/tasks/TEMPLATE.md`.
