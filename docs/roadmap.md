@@ -75,8 +75,8 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 | Task | Specification | Status |
 | --- | --- | --- |
 | 5.1 Establish Bet value objects and settlement calculations | `tasks/phase-05/01-bet-domain-calculations.md` | DONE |
-| 5.2 Create and retrieve a user's pending bets | `tasks/phase-05/02-create-and-read-bets.md` | QA IN REVIEW |
-| 5.3 Update and settle a pending bet | `tasks/phase-05/03-update-and-settle-bets.md` | PLANNED |
+| 5.2 Create and retrieve a user's pending bets | `tasks/phase-05/02-create-and-read-bets.md` | DONE |
+| 5.3 Update and settle a pending bet | `tasks/phase-05/03-update-and-settle-bets.md` | DONE |
 
 ## 8. Phase 6 — RabbitMQ integration
 

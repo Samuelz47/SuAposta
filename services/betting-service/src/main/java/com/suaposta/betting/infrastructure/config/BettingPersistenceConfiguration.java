@@ -3,12 +3,15 @@ package com.suaposta.betting.infrastructure.config;
 import com.suaposta.betting.application.service.CreateBetService;
 import com.suaposta.betting.application.service.GetBetService;
 import com.suaposta.betting.application.service.ListBetsService;
+import com.suaposta.betting.application.service.SettleBetService;
+import com.suaposta.betting.application.service.UpdateBetService;
 import com.suaposta.betting.application.port.out.BetRepository;
 import com.suaposta.betting.infrastructure.persistence.BetEntity;
 import com.suaposta.betting.infrastructure.persistence.SpringDataBetRepository;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.Map;
+import java.time.Clock;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.springframework.context.annotation.Bean;
@@ -96,6 +99,21 @@ public class BettingPersistenceConfiguration {
     @Bean
     public GetBetService getBetService(BetRepository betRepository) {
         return new GetBetService(betRepository);
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    public UpdateBetService updateBetService(BetRepository betRepository, Clock clock) {
+        return new UpdateBetService(betRepository, clock);
+    }
+
+    @Bean
+    public SettleBetService settleBetService(BetRepository betRepository, Clock clock) {
+        return new SettleBetService(betRepository, clock);
     }
 
     private static String firstText(String first, String second) {

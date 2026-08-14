@@ -25,6 +25,13 @@ public class BetExceptionHandler {
         return response(HttpStatus.NOT_FOUND, "Bet not found", request);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiErrorResponse> handleLifecycleConflict(
+            IllegalStateException exception,
+            HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleDomainValidation(
             IllegalArgumentException exception,

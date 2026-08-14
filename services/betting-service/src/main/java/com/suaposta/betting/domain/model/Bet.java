@@ -22,7 +22,7 @@ public final class Bet {
     private final Instant placedAt;
     private final String notes;
     private final Instant createdAt;
-    private final Instant updatedAt;
+    private Instant updatedAt;
 
     private BetStatus status;
     private BigDecimal profit;
@@ -194,12 +194,50 @@ public final class Bet {
         return updatedAt;
     }
 
+    public Bet update(
+            String sport,
+            String league,
+            String homeTeam,
+            String awayTeam,
+            String market,
+            String selection,
+            BigDecimal odds,
+            BigDecimal stake,
+            Instant placedAt,
+            String notes,
+            Instant updatedAt) {
+        ensurePendingForUpdate();
+
+        var normalizedOdds = new Odds(odds);
+        var normalizedStake = new Stake(stake);
+
+        return new Bet(
+                id,
+                userId,
+                sport,
+                league,
+                homeTeam,
+                awayTeam,
+                market,
+                selection,
+                normalizedOdds,
+                normalizedStake,
+                BetStatus.PENDING,
+                null,
+                null,
+                placedAt,
+                null,
+                notes,
+                createdAt,
+                updatedAt);
+    }
+
     public void settle(BetStatus targetStatus) {
         settle(targetStatus, null);
     }
 
     public void settle(BetStatus targetStatus, BigDecimal cashoutReturn) {
-        ensurePending();
+        ensurePendingForSettlement();
         if (targetStatus == null) {
             throw new IllegalArgumentException("Settlement status is required");
         }
@@ -211,7 +249,31 @@ public final class Bet {
         returnAmount = settlement.returnAmount();
     }
 
-    private void ensurePending() {
+    public void settleAt(BetStatus targetStatus, BigDecimal cashoutReturn, Instant operationTime) {
+        ensurePendingForSettlement();
+        if (targetStatus == null) {
+            throw new IllegalArgumentException("Settlement status is required");
+        }
+        if (operationTime == null) {
+            throw new IllegalArgumentException("Settlement time is required");
+        }
+
+        Settlement settlement = calculateSettlement(targetStatus, cashoutReturn);
+
+        status = targetStatus;
+        profit = settlement.profit();
+        returnAmount = settlement.returnAmount();
+        settledAt = operationTime;
+        updatedAt = operationTime;
+    }
+
+    private void ensurePendingForUpdate() {
+        if (status != BetStatus.PENDING) {
+            throw new IllegalStateException("Only pending bets can be updated");
+        }
+    }
+
+    private void ensurePendingForSettlement() {
         if (status != BetStatus.PENDING) {
             throw new IllegalStateException("Only pending bets can be settled");
         }

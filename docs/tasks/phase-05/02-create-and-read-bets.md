@@ -644,7 +644,7 @@ Apply `docs/definition-of-done.md`.
 Current status:
 
 ```text
-QA IN REVIEW
+DONE
 ```
 
 The original Task 5.2 blind API/persistence tests remain valid.
@@ -657,9 +657,9 @@ The specification was subsequently clarified to define:
 
 Additional blind coverage for those clarified contracts has been added in Red and approved by the human.
 
-| Current status | Pending gate                         |
-| -------------- | ------------------------------------ |
-| QA IN REVIEW   | Final QA verdict and human approval. |
+| Current status | Pending gate |
+| -------------- | ------------ |
+| DONE           | —            |
 
 | Gate                                    | Decision / evidence                                                                                                                                                                                           | Date / approver                    |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
@@ -669,7 +669,7 @@ Additional blind coverage for those clarified contracts has been added in Red an
 | Tests approved                          | Human approved the complete Task 5.2 Red suite, including the additional application and direct repository integration coverage.                                                                              | 2026-08-13 / human                 |
 | Implementation in Green                 | Implemented the application use cases, ownership-scoped repository port/adapter, PostgreSQL migration, and `POST /bets`, `GET /bets`, and `GET /bets/{id}` contracts. Task 5.1: 49/49 Green. Task 5.2: 62/62 Green. Betting Service: 114/114 Green. The Gateway test doubles were changed to ephemeral ports with test-only upstream URL overrides so the root check is deterministic. `:services:betting-service:test --rerun-tasks`, `:services:betting-service:check --rerun-tasks`, `:services:api-gateway:test --rerun-tasks`, `:services:api-gateway:check --rerun-tasks`, and two independent `./gradlew check --rerun-tasks` executions all passed; each root execution reported 206/206 tests Green. `git diff --check` passed. | 2026-08-13 / implementation agent |
 | Human diff review                       | Human explicitly approved the implementation and authorized the pre-QA handoff.                                                                                                                                 | 2026-08-13 / human                 |
-| QA verdict                              | Pending independent QA and human approval of the QA outcome.                                                                                                                                                   | —                                  |
+| QA verdict                              | `APPROVED WITH RESERVATIONS`. Human approved the QA outcome; the task is finalized. The remaining API-contract ambiguities are recorded as non-blocking follow-ups.                                                                                                  | 2026-08-13 / human                 |
 
 ### Existing test scope and evidence
 

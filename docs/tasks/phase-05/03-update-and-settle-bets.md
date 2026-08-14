@@ -522,4 +522,33 @@ Apply `docs/definition-of-done.md`.
 
 ## Status and evidence
 
-Use the status table from `docs/tasks/TEMPLATE.md`.
+Current status: `DONE`
+
+| Current status | Pending gate |
+| --- | --- |
+| DONE | Independent final QA verdict approved by human. |
+
+| Gate | Decision / evidence | Date / approver |
+| --- | --- | --- |
+| Specification provided | Approved Task 5.3 contract and settledAt decision reviewed | 2026-08-14 / Human |
+| Tests in Red | `./gradlew :services:betting-service:compileTestJava --no-daemon` failed only because the Task 5.3 implementation types are not yet present: `UpdateBetService`, `SettleBetService`, `UpdateBetCommand`, and `SettleBetCommand`. Production compilation passed with `./gradlew :services:betting-service:compileJava --no-daemon`. | 2026-08-14 / Test agent |
+| Tests approved | Human approved the blind tests and authorized handoff to the implementation agent. | 2026-08-14 / Human |
+| Implementation in Green | Implemented ownership-scoped update and settlement use cases, atomic pending-Bet update, domain-delegated settlement, service-controlled timestamps through `Clock`, HTTP endpoints, safe lifecycle conflict handling, and the documented GET pagination defaults. Focused Task 5.3 results: application 14/14, API 36/36, persistence 4/4. Betting Service 168/168. `:services:betting-service:check`, `:services:api-gateway:check`, two independent `./gradlew check --rerun-tasks` executions, and `git diff --check` passed. No migration or event publishing was added. | 2026-08-14 / implementation agent |
+| Human diff review | Human explicitly approved the implementation diff and authorized handoff to the final QA agent. | 2026-08-14 / human |
+| QA verdict | `APPROVED WITH RESERVATIONS`. Human approved the QA outcome. The remaining API-contract markdown fence and test-strengthening follow-ups are non-blocking. | 2026-08-14 / Human |
+
+### Test-agent handoff
+
+The blind-test, implementation, human diff review, and independent QA stages are complete. The human approved the QA outcome and finalized this task. No production code was changed by the test agent.
+
+### Approved-test changes
+
+No approved tests from Tasks 5.1 or 5.2 were altered.
+
+On 2026-08-14, the human explicitly authorized three corrections to the protected Task 5.3 tests after the first implementation run exposed test-only defects:
+
+* added the missing `finalStatuses` method source used by the final-Bet update conflict test, without changing its expectations;
+* corrected only the rounded CASHOUT return expectation from `80.126` to `80.13`, preserving the approved scale `2`, `HALF_UP`, and `profit = -19.87` contract;
+* corrected `BetTask53HttpTestSupport` so a missing `X-User-Id` sends an HTTP request without that header instead of failing inside the Java HTTP client.
+
+No other expectation, fixture, test, or Task 5.1/5.2 coverage was changed.
