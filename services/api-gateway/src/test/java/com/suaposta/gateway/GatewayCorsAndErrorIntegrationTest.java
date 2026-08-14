@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,7 +35,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 class GatewayCorsAndErrorIntegrationTest {
 
     private static final int GATEWAY_PORT = 8080;
-    private static final int BETTING_SERVICE_PORT = 8082;
     private static final String APPROVED_FRONTEND_ORIGIN = "http://localhost:4200";
     private static final String DISALLOWED_ORIGIN = "https://malicious.example";
     private static final String VALID_AUTHORIZATION = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNDBkYTU4MC1hMDE3LTRhMTEtYmQ0Mi1jNjdhYTY0MDkxNjYiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.zBIXoysIys5tveeN8Q_55fOeTMMI9IpcvY-jFHdGmro";
@@ -47,8 +47,9 @@ class GatewayCorsAndErrorIntegrationTest {
 
     @BeforeAll
     static void startGatewayAndServiceDouble() throws Exception {
-        BETTING_SERVICE.start(BETTING_SERVICE_PORT);
-        gatewayContext = ApplicationTestSupport.startApplication();
+        BETTING_SERVICE.start();
+        gatewayContext = ApplicationTestSupport.startApplication(Map.of(
+                "BETTING_SERVICE_URL", BETTING_SERVICE.url()));
         assertThat(gatewayContext).isInstanceOf(WebServerApplicationContext.class);
         assertThat(((WebServerApplicationContext) gatewayContext).getWebServer().getPort())
                 .isEqualTo(GATEWAY_PORT);
@@ -334,10 +335,14 @@ class GatewayCorsAndErrorIntegrationTest {
                 new ServiceResponse(200, "{\"service\":\"BETTING_SERVICE\"}", java.util.Map.of()));
         private HttpServer server;
 
-        private void start(int port) throws IOException {
-            server = HttpServer.create(new InetSocketAddress("localhost", port), 0);
+        private void start() throws IOException {
+            server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             server.createContext("/", this::handle);
             server.start();
+        }
+
+        private String url() {
+            return "http://localhost:" + server.getAddress().getPort();
         }
 
         private void handle(HttpExchange exchange) throws IOException {

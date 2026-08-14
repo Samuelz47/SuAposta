@@ -36,8 +36,6 @@ import java.util.stream.Stream;
 class GatewayJwtAuthenticationIntegrationTest {
 
     private static final int GATEWAY_PORT = 8080;
-    private static final int AUTH_SERVICE_PORT = 8081;
-    private static final int BETTING_SERVICE_PORT = 8082;
     private static final String TEST_SECRET = "task-3-3-only-signing-secret-32-bytes";
     private static final String USER_ID = "b40da580-a017-4a11-bd42-c67aa6409166";
     private static final String OTHER_USER_ID = "f8c6eb32-54d4-4024-9581-7a0a8d6f4f19";
@@ -56,9 +54,11 @@ class GatewayJwtAuthenticationIntegrationTest {
 
     @BeforeAll
     static void startGatewayAndServiceDoubles() throws Exception {
-        AUTH_SERVICE.start(AUTH_SERVICE_PORT);
-        BETTING_SERVICE.start(BETTING_SERVICE_PORT);
-        gatewayContext = ApplicationTestSupport.startApplication();
+        AUTH_SERVICE.start();
+        BETTING_SERVICE.start();
+        gatewayContext = ApplicationTestSupport.startApplication(Map.of(
+                "AUTH_SERVICE_URL", AUTH_SERVICE.url(),
+                "BETTING_SERVICE_URL", BETTING_SERVICE.url()));
         assertThat(gatewayContext).isInstanceOf(WebServerApplicationContext.class);
         assertThat(((WebServerApplicationContext) gatewayContext).getWebServer().getPort())
                 .isEqualTo(GATEWAY_PORT);
@@ -325,10 +325,14 @@ class GatewayJwtAuthenticationIntegrationTest {
             this.serviceName = serviceName;
         }
 
-        private void start(int port) throws IOException {
-            server = HttpServer.create(new InetSocketAddress("localhost", port), 0);
+        private void start() throws IOException {
+            server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             server.createContext("/", this::handle);
             server.start();
+        }
+
+        private String url() {
+            return "http://localhost:" + server.getAddress().getPort();
         }
 
         private void handle(HttpExchange exchange) throws IOException {
