@@ -14,6 +14,7 @@ dependencyResolutionManagement {
 rootProject.name = 'suaposta'
 
 include(
+    ':libs:messaging-contract',
     ':services:api-gateway',
     ':services:auth-service',
     ':services:betting-service',

@@ -82,7 +82,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 
 | Task | Specification | Status |
 | --- | --- | --- |
-| 6.1 Configure documented exchange, queue, and event envelope | `tasks/phase-06/01-messaging-contract.md` | PLANNED |
+| 6.1 Configure documented exchange, queue, and event envelope | `tasks/phase-06/01-messaging-contract.md` | DONE |
 | 6.2 Publish betting lifecycle events after persistence | `tasks/phase-06/02-publish-betting-events.md` | PLANNED |
 | 6.3 Consume events idempotently into analytics projections | `tasks/phase-06/03-consume-events-idempotently.md` | PLANNED |
 
