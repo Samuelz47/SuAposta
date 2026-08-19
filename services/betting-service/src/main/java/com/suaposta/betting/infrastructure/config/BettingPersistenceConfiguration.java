@@ -5,6 +5,7 @@ import com.suaposta.betting.application.service.GetBetService;
 import com.suaposta.betting.application.service.ListBetsService;
 import com.suaposta.betting.application.service.SettleBetService;
 import com.suaposta.betting.application.service.UpdateBetService;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
 import com.suaposta.betting.application.port.out.BetRepository;
 import com.suaposta.betting.infrastructure.persistence.BetEntity;
 import com.suaposta.betting.infrastructure.persistence.SpringDataBetRepository;
@@ -87,8 +88,8 @@ public class BettingPersistenceConfiguration {
     }
 
     @Bean
-    public CreateBetService createBetService(BetRepository betRepository) {
-        return new CreateBetService(betRepository);
+    public CreateBetService createBetService(BetRepository betRepository, BetEventPublisher eventPublisher) {
+        return new CreateBetService(betRepository, eventPublisher);
     }
 
     @Bean
@@ -107,13 +108,15 @@ public class BettingPersistenceConfiguration {
     }
 
     @Bean
-    public UpdateBetService updateBetService(BetRepository betRepository, Clock clock) {
-        return new UpdateBetService(betRepository, clock);
+    public UpdateBetService updateBetService(
+            BetRepository betRepository, Clock clock, BetEventPublisher eventPublisher) {
+        return new UpdateBetService(betRepository, clock, eventPublisher);
     }
 
     @Bean
-    public SettleBetService settleBetService(BetRepository betRepository, Clock clock) {
-        return new SettleBetService(betRepository, clock);
+    public SettleBetService settleBetService(
+            BetRepository betRepository, Clock clock, BetEventPublisher eventPublisher) {
+        return new SettleBetService(betRepository, clock, eventPublisher);
     }
 
     private static String firstText(String first, String second) {

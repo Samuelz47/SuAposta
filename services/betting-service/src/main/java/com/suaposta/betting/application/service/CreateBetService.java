@@ -1,19 +1,23 @@
 package com.suaposta.betting.application.service;
 
 import com.suaposta.betting.application.dto.CreateBetCommand;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
+import com.suaposta.betting.application.port.out.BetRepository;
 import com.suaposta.betting.domain.model.Bet;
 import com.suaposta.betting.domain.model.Odds;
 import com.suaposta.betting.domain.model.Stake;
-import com.suaposta.betting.application.port.out.BetRepository;
+import com.suaposta.messaging.contract.MessagingConstants;
 import java.time.Instant;
 import java.util.UUID;
 
 public final class CreateBetService {
 
     private final BetRepository betRepository;
+    private final BetEventPublisher eventPublisher;
 
-    public CreateBetService(BetRepository betRepository) {
+    public CreateBetService(BetRepository betRepository, BetEventPublisher eventPublisher) {
         this.betRepository = betRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public Bet create(UUID authenticatedUserId, CreateBetCommand command) {
@@ -32,6 +36,10 @@ public final class CreateBetService {
                 command.placedAt(),
                 command.notes(),
                 now);
-        return betRepository.save(bet);
+        var persisted = betRepository.save(bet);
+        eventPublisher.publish(
+                BetEventFactory.created(persisted),
+                MessagingConstants.BET_CREATED_ROUTING_KEY);
+        return persisted;
     }
 }

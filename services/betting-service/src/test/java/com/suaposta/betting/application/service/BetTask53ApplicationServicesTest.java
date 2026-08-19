@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.suaposta.betting.application.dto.CreateBetCommand;
 import com.suaposta.betting.application.dto.SettleBetCommand;
 import com.suaposta.betting.application.dto.UpdateBetCommand;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
 import com.suaposta.betting.application.port.out.BetRepository;
 import com.suaposta.betting.domain.model.Bet;
 import com.suaposta.betting.domain.model.BetStatus;
@@ -38,14 +39,17 @@ class BetTask53ApplicationServicesTest {
     @Mock
     private BetRepository betRepository;
 
+    @Mock
+    private BetEventPublisher publisher;
+
     private UpdateBetService updateBetService;
     private SettleBetService settleBetService;
 
     @BeforeEach
     void setUp() {
         var clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        updateBetService = new UpdateBetService(betRepository, clock);
-        settleBetService = new SettleBetService(betRepository, clock);
+        updateBetService = new UpdateBetService(betRepository, clock, publisher);
+        settleBetService = new SettleBetService(betRepository, clock, publisher);
     }
 
     @Test

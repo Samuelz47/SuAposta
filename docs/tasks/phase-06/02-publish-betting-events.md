@@ -1348,7 +1348,7 @@ Additionally:
 Current status:
 
 ```text
-PLANNED
+DONE
 ```
 
 Use the status/evidence table from `docs/tasks/TEMPLATE.md`.
@@ -1368,3 +1368,28 @@ DONE
 ```
 
 Human approval is required before moving from approved Red tests to implementation.
+
+| Gate | Decision / evidence | Date / approver |
+| --- | --- | --- |
+| Specification provided | Task 6.2 specification and required architecture, event, API, testing, and Phase 5 documents reviewed. | 2026-08-18 / test agent |
+| Tests in Red | `compileJava` passed; `compileTestJava` and `test --tests '*Task62*'` fail only because production `BetEventPublisher` is absent. | 2026-08-18 / test agent |
+| Tests approved | Human approval explicitly provided in the Codex conversation; no approved test was changed after approval. | 2026-08-18 / human |
+| Implementation in Green | Task 6.2 passed 43/43 focused tests; the complete Betting suite passed 211/211; Betting, messaging contract, Analytics, Auth, Gateway, and two root checks passed. | 2026-08-18 / implementation agent |
+| Human diff review | Human explicitly approved the implementation diff and requested handoff to final QA. | 2026-08-18 / human |
+| QA verdict | APPROVED. Focused Task 6.2 tests, complete Betting Service suite, and root `check` passed; independent audit found no blockers or reservations. | 2026-08-18 / final QA agent |
+
+### Test-agent evidence
+
+- Created `Task62ApplicationPublishingTest`, `Task62PublisherIntegrationTest`, and `Task62ArchitectureBoundaryTest`.
+- Added only test-scoped dependencies in `services/betting-service/build.gradle`.
+- The publisher integration test obtains `BetEventPublisher` through a minimal Spring context and does not require a concrete Rabbit adapter constructor.
+- Serialization coverage uses a cyclic payload, requires a `JsonProcessingException` cause, and verifies that no message reaches the queue.
+- Historical Betting Service regression passed: 168 tests, 0 failures, using a temporary exclusion of only the three new Task 6.2 test files; the temporary init script was removed.
+- `:libs:messaging-contract:test` passed.
+- `:services:analytics-service:check` passed.
+- `git diff --check` passed.
+- No production Java file, approved test, commit, push, merge, or staging command was changed or performed.
+
+### Approved-test changes
+
+None.

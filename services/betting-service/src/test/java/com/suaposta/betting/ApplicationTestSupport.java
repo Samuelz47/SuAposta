@@ -15,7 +15,9 @@ final class ApplicationTestSupport {
     }
 
     static ConfigurableApplicationContext startApplication() {
-        return new SpringApplicationBuilder(findApplicationClass()).run();
+        return new SpringApplicationBuilder(findApplicationClass())
+                .properties("management.health.rabbit.enabled=false")
+                .run();
     }
 
     private static Class<?> findApplicationClass() {

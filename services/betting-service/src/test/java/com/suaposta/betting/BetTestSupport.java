@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -22,6 +23,9 @@ import java.util.stream.Collectors;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 final class BetTestSupport {
 
@@ -36,12 +40,23 @@ final class BetTestSupport {
 
     static ConfigurableApplicationContext startApplication() {
         return new SpringApplicationBuilder(BettingServiceApplication.class)
+                .sources(HistoricalPublisherTestConfiguration.class)
                 .properties(
                         "server.port=0",
                         "spring.datasource.url=" + databaseUrl(),
                         "spring.datasource.username=" + databaseUser(),
                         "spring.datasource.password=" + databasePassword())
                 .run();
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class HistoricalPublisherTestConfiguration {
+
+        @Bean
+        @Primary
+        BetEventPublisher historicalTestBetEventPublisher() {
+            return org.mockito.Mockito.mock(BetEventPublisher.class);
+        }
     }
 
     static ObjectNode validCreateRequest() {

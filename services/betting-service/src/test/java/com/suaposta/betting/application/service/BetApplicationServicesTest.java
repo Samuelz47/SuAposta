@@ -12,6 +12,7 @@ import com.suaposta.betting.application.dto.BetFilters;
 import com.suaposta.betting.application.dto.BetPage;
 import com.suaposta.betting.application.dto.BetPageRequest;
 import com.suaposta.betting.application.dto.CreateBetCommand;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
 import com.suaposta.betting.domain.model.Bet;
 import com.suaposta.betting.domain.model.BetStatus;
 import com.suaposta.betting.application.port.out.BetRepository;
@@ -37,13 +38,16 @@ class BetApplicationServicesTest {
     @Mock
     private BetRepository betRepository;
 
+    @Mock
+    private BetEventPublisher publisher;
+
     private CreateBetService createBetService;
     private ListBetsService listBetsService;
     private GetBetService getBetService;
 
     @BeforeEach
     void setUp() {
-        createBetService = new CreateBetService(betRepository);
+        createBetService = new CreateBetService(betRepository, publisher);
         listBetsService = new ListBetsService(betRepository);
         getBetService = new GetBetService(betRepository);
     }
@@ -196,8 +200,9 @@ class BetApplicationServicesTest {
 
     private static Bet pendingBet(UUID userId) {
         var fixtureRepository = org.mockito.Mockito.mock(BetRepository.class);
+        var fixturePublisher = org.mockito.Mockito.mock(BetEventPublisher.class);
         when(fixtureRepository.save(any(Bet.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        return new CreateBetService(fixtureRepository).create(userId, validCommand());
+        return new CreateBetService(fixtureRepository, fixturePublisher).create(userId, validCommand());
     }
 
     private static CreateBetCommand validCommand() {

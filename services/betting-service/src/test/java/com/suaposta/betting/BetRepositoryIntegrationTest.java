@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.suaposta.betting.application.dto.BetFilters;
 import com.suaposta.betting.application.dto.BetPageRequest;
 import com.suaposta.betting.application.dto.CreateBetCommand;
+import com.suaposta.betting.application.port.out.BetEventPublisher;
 import com.suaposta.betting.application.service.CreateBetService;
 import com.suaposta.betting.domain.model.Bet;
 import com.suaposta.betting.domain.model.BetStatus;
@@ -289,8 +290,9 @@ class BetRepositoryIntegrationTest {
             String stake,
             String placedAt) {
         var capturingPort = mock(BetRepository.class);
+        var publisher = mock(BetEventPublisher.class);
         when(capturingPort.save(any(Bet.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        var service = new CreateBetService(capturingPort);
+        var service = new CreateBetService(capturingPort, publisher);
         return service.create(userId, new CreateBetCommand(
                 sport,
                 league,
