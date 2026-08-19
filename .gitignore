@@ -35,6 +35,8 @@ out/
 **/target/
 **/build/
 **/out/
+!**/src/main/java/**/port/out/
+!**/src/main/java/**/port/out/**
 *.class
 *.jar
 *.war
