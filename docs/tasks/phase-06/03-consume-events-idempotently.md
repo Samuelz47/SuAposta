@@ -1655,23 +1655,64 @@ Additionally:
 Current status:
 
 ```text
-PLANNED
-```
-
-Use the status/evidence table from `docs/tasks/TEMPLATE.md`.
-
-The expected workflow is:
-
-```text
-PLANNED
-  ↓
-TESTS IN REVIEW
-  ↓
-IMPLEMENTATION IN REVIEW
-  ↓
-QA
-  ↓
 DONE
 ```
 
-Human approval is required before moving from approved Red tests to implementation.
+The human approved the Red tests, directly instructed the implementation agent to implement
+Task 6.3, approved the test-only pgJDBC boundary corrections recorded below, approved the
+completed implementation diff, and approved the independent final QA verdict.
+
+| Gate | Decision / evidence | Date / approver |
+| --- | --- | --- |
+| Specification provided | Task 6.3 specification and required architecture, event, testing, lifecycle, and prior Phase 5/6 documents reviewed. | 2026-08-19 / implementation agent |
+| Tests in Red | Baseline production/test compilation passed; focused `Task63*` execution failed only for missing Task 6.3 production behavior and schema. | 2026-08-19 / implementation agent |
+| Tests approved | Human explicitly stated that the Task 6.3 RED tests were approved and protected before implementation. | 2026-08-19 / human |
+| Implementation in Green | Task 6.3 passed 16/16; concurrent application and Rabbit duplicate tests passed three isolated runs each; atomicity, invalid-message, and second-CREATED tests passed; Analytics and all external regressions passed; two root checks and `git diff --check` passed. | 2026-08-19 / implementation agent |
+| Human diff review | Human explicitly approved the implementation and requested finalization for handoff to final QA. | 2026-08-19 / human |
+| QA verdict | `APPROVED`; independent final QA completed with no blockers or reservations. Human approved the QA outcome and authorized finalization. | 2026-08-19 / final QA agent + human |
+
+New task files were exposed for final QA using only `git add -N`; no regular staging command,
+commit, push, or merge was performed.
+
+### Approved-test changes
+
+- Human-approved pgJDBC read-boundary correction in `Task63RabbitConsumerIntegrationTest`:
+  PostgreSQL `TIMESTAMP WITH TIME ZONE` values are read as `OffsetDateTime` and converted to
+  `Instant`; fixtures and assertions are unchanged.
+- Human-approved pgJDBC write-boundary correction in `Task63PersistenceIntegrationTest`:
+  the two test-owned `processed_at` bindings convert the fixed `Instant` to UTC
+  `OffsetDateTime`; uniqueness behavior and assertions are unchanged.
+
+### QA report
+
+VERDICT: APPROVED
+
+Blockers:
+
+None.
+
+Important issues:
+
+None.
+
+Non-blocking improvements:
+
+None required for Task 6.3.
+
+Evidence:
+
+- Task 6.3 focused tests: 16/16 Green.
+- Concurrent application duplicate test: three isolated Green runs.
+- Concurrent Rabbit duplicate test: three isolated Green runs.
+- Both atomicity tests passed with rollback verified.
+- Invalid-message test passed with no projection or processed-event mutation and settled queue.
+- Second `BET_CREATED` was rejected without overwriting the existing projection.
+- Flyway migration created `analytics_bets` and `processed_events` with durable unique identities and numeric financial columns.
+- Idempotency uses PostgreSQL uniqueness and `ON CONFLICT(event_id) DO NOTHING`.
+- Projection mutation and processed-event registration share the Analytics transaction boundary.
+- Financial values remain `BigDecimal` and are copied from event payloads without recalculation.
+- Timestamp mappings match the documented envelope/payload sources.
+- Listener, application, persistence, and Analytics/Betting boundaries were independently verified.
+- No retry, DLQ, DLX, outbox, replay, or process-local concurrency workaround was introduced.
+- Analytics, messaging-contract, Betting, Auth, Gateway, and both root checks passed.
+- `git diff --check` passed; no commit, push, merge, or regular staging was performed.
