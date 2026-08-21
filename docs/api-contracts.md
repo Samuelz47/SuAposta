@@ -694,6 +694,32 @@ minStake
 maxStake
 ```
 
+All parameters are optional. Every supplied parameter is combined with the authenticated-user predicate and every other supplied parameter using logical `AND`.
+
+Filter contract:
+
+| Parameter | Semantics |
+| --- | --- |
+| `startDate` | `placedAt >= startDate` |
+| `endDate` | `placedAt <= endDate` |
+| `sport` | Exact, case-sensitive equality with `sport` |
+| `league` | Exact, case-sensitive equality with `league` |
+| `team` | Exact, case-sensitive equality with either `homeTeam` or `awayTeam` |
+| `market` | Exact, case-sensitive equality with `market` |
+| `status` | Exact enum value: `PENDING`, `WON`, `LOST`, `VOID`, `CASHOUT`, or `CANCELLED` |
+| `minOdds` | `odds >= minOdds` |
+| `maxOdds` | `odds <= maxOdds` |
+| `minStake` | `stake >= minStake` |
+| `maxStake` | `stake <= maxStake` |
+
+Date limits are inclusive and are parsed as ISO-8601 instants. Offset-bearing values represent their equivalent instant. When both are supplied, `startDate` must be less than or equal to `endDate`.
+
+Text filters must be non-blank and are not trimmed, normalized, partially matched, or matched case-insensitively by the server. `team` never matches `selection`.
+
+Odds filters use the domain odds scale (`4`, `HALF_UP`) and must normalize to a value strictly greater than `1.0000`. Stake filters use the money scale (`2`, `HALF_UP`) and must normalize to a value strictly greater than `0.00`. After normalization, each minimum must be less than or equal to its corresponding maximum.
+
+Malformed dates or decimals, blank text values, unsupported statuses, invalid ranges, and values outside those constraints return `400 Bad Request` using the standard validation error response.
+
 Example:
 
 ```http
@@ -710,7 +736,7 @@ GET /analytics/dashboard?startDate=2026-07-01T00:00:00Z&endDate=2026-07-31T23:59
     "roi": 12.00,
     "yield": 12.00,
     "winRate": 55.00,
-    "averageOdds": 2.05,
+    "averageOdds": 2.0500,
     "betsCount": 20,
     "wonBets": 11,
     "lostBets": 9,
@@ -727,10 +753,61 @@ GET /analytics/dashboard?startDate=2026-07-01T00:00:00Z&endDate=2026-07-31T23:59
     "league": null,
     "team": null,
     "market": null,
-    "status": null
+    "status": null,
+    "minOdds": null,
+    "maxOdds": null,
+    "minStake": null,
+    "maxStake": null
   }
 }
 ```
+
+The formatting above is illustrative JSON; the `filters` object contains all eleven filter fields in this order-independent shape:
+
+```text
+startDate, endDate, sport, league, team, market, status,
+minOdds, maxOdds, minStake, maxStake
+```
+
+It echoes the effective filter values. Missing filters are `null`; dates are serialized as ISO-8601 instants; odds and stake filters are serialized at their normalized domain scales.
+
+When no projection matches, the complete response is:
+
+```json
+{
+  "summary": {
+    "totalStake": 0.00,
+    "totalProfit": 0.00,
+    "roi": 0.00,
+    "yield": 0.00,
+    "winRate": 0.00,
+    "averageOdds": 0.0000,
+    "betsCount": 0,
+    "wonBets": 0,
+    "lostBets": 0,
+    "voidBets": 0,
+    "cashoutBets": 0,
+    "cancelledBets": 0,
+    "maxDrawdown": 0.00,
+    "currentDrawdown": 0.00
+  },
+  "filters": {
+    "startDate": null,
+    "endDate": null,
+    "sport": null,
+    "league": null,
+    "team": null,
+    "market": null,
+    "status": null,
+    "minOdds": null,
+    "maxOdds": null,
+    "minStake": null,
+    "maxStake": null
+  }
+}
+```
+
+If valid filters were supplied but matched no projection, their effective values replace the corresponding `null` values in this otherwise identical response.
 
 ### Rules
 
@@ -738,8 +815,11 @@ GET /analytics/dashboard?startDate=2026-07-01T00:00:00Z&endDate=2026-07-31T23:59
 - Must return only data from authenticated user.
 - Must read from Analytics Service projection tables.
 - Must not query Betting Service database directly.
-- Pending bets should not affect performance metrics.
-- If there is no data, numeric metrics should return zero.
+- Metric formulas, status eligibility, scales, rounding, zero denominators, and drawdown ordering follow the dashboard summary aggregation contract in `docs/domain.md`.
+- A `status` filter narrows the source rows but never changes a metric's eligibility set. For example, `status=PENDING` can produce a non-zero `betsCount` while all financial, percentage, average-odds, and drawdown metrics remain zero.
+- Missing or malformed trusted `X-User-Id` at the Analytics boundary returns `401 Unauthorized`; ownership must never be accepted from a query parameter or request body.
+- If no projection matches the authenticated user and filters, return `200 OK` with every summary numeric value zero at its documented scale, every count zero, and the effective `filters` object.
+- `summary` always contains exactly: `totalStake`, `totalProfit`, `roi`, `yield`, `winRate`, `averageOdds`, `betsCount`, `wonBets`, `lostBets`, `voidBets`, `cashoutBets`, `cancelledBets`, `maxDrawdown`, and `currentDrawdown`.
 
 ---
 

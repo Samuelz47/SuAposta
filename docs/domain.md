@@ -307,6 +307,164 @@ A repeated settlement attempt must:
 
 Correction and reopening flows are outside this task.
 
+## Dashboard summary aggregation contract
+
+This section is the source of truth for the analytical metrics exposed by:
+
+```text
+GET /analytics/dashboard
+```
+
+Analytics aggregates the projected values stored in `analytics_bets`. It must not recalculate bet settlement values from stake and odds.
+
+### Filtered projection set
+
+Let `F` be the projection rows that:
+
+- belong to the authenticated `userId`; and
+- satisfy every supplied dashboard filter.
+
+Filter semantics and validation are defined in `docs/api-contracts.md`.
+
+Metric eligibility is applied after `F` is established. A status filter narrows `F`; it does not change the eligibility rule of any metric.
+
+### Status sets
+
+The dashboard uses these explicit sets:
+
+```text
+all statuses = PENDING, WON, LOST, VOID, CASHOUT, CANCELLED
+performance statuses = WON, LOST, CASHOUT
+win-rate statuses = WON, LOST
+```
+
+Status eligibility by metric:
+
+| Metric | Eligible rows from `F` |
+| --- | --- |
+| `totalStake` | `WON`, `LOST`, `CASHOUT` |
+| `totalProfit` | `WON`, `LOST`, `CASHOUT` |
+| `roi` | `WON`, `LOST`, `CASHOUT` |
+| `yield` | `WON`, `LOST`, `CASHOUT` |
+| `winRate` | numerator `WON`; denominator `WON` + `LOST` |
+| `averageOdds` | `WON`, `LOST`, `CASHOUT` |
+| `betsCount` | every row in `F`, including `PENDING`, `VOID`, and `CANCELLED` |
+| Status-specific counts | rows in `F` having that exact status |
+| `maxDrawdown`, `currentDrawdown` | `WON`, `LOST`, `CASHOUT` |
+
+Consequences:
+
+- `PENDING` affects only `betsCount`; it is not part of any financial, rate, odds-average, or drawdown calculation.
+- `VOID` and `CANCELLED` affect `betsCount` and their respective status counts, but not turnover, profit, rates, average odds, or drawdown.
+- `CASHOUT` participates in turnover, profit, ROI, yield, average odds, and drawdown using its projected `stake` and `profit`.
+- `CASHOUT` is neither a win nor a loss and does not participate in the win-rate numerator or denominator.
+
+### Total stake and total profit
+
+For `P`, the rows in `F` whose status is `WON`, `LOST`, or `CASHOUT`:
+
+```text
+totalStake = sum(P.stake)
+totalProfit = sum(P.profit)
+```
+
+Projected `profit` is authoritative. Analytics must not derive it again.
+
+### ROI and yield
+
+For the first version, ROI and yield intentionally use the same formula and eligibility set:
+
+```text
+roi = totalStake == 0
+    ? 0.00
+    : (totalProfit * 100) / totalStake, scale 2, HALF_UP
+
+yield = roi
+```
+
+Multiplication by `100` occurs before division so that no intermediate quotient is rounded. The operations must remain `BigDecimal`.
+
+### Win rate
+
+```text
+resolvedWinRateCount = wonBets + lostBets
+
+winRate = resolvedWinRateCount == 0
+    ? 0.00
+    : (wonBets * 100) / resolvedWinRateCount, scale 2, HALF_UP
+```
+
+`VOID`, `CANCELLED`, `CASHOUT`, and `PENDING` are excluded from both numerator and denominator.
+
+### Average odds
+
+Average odds is the unweighted arithmetic mean of the projected odds for `WON`, `LOST`, and `CASHOUT` rows:
+
+```text
+averageOdds = performanceBetsCount == 0
+    ? 0.0000
+    : sum(P.odds) / performanceBetsCount, scale 4, HALF_UP
+```
+
+Do not weight the average by stake. Do not round individual odds before summing them. Round only the final average.
+
+### Counts
+
+```text
+betsCount       = count(F)
+wonBets         = count(F where status = WON)
+lostBets        = count(F where status = LOST)
+voidBets        = count(F where status = VOID)
+cashoutBets     = count(F where status = CASHOUT)
+cancelledBets   = count(F where status = CANCELLED)
+```
+
+The API does not expose `pendingBets` in this version. Pending rows are nevertheless included in `betsCount`.
+
+### Drawdown
+
+The first dashboard version does not require an initial bankroll. Drawdown is the decline from the previous peak of the filtered cumulative-profit curve.
+
+Order the `WON`, `LOST`, and `CASHOUT` rows by:
+
+```text
+settledAt ascending, then betId ascending
+```
+
+The `betId` tie-breaker makes equal settlement timestamps deterministic.
+
+Calculate:
+
+```text
+cumulativeProfit = 0.00
+peak = 0.00
+maxDrawdown = 0.00
+
+for each eligible row:
+    cumulativeProfit = cumulativeProfit + row.profit
+    peak = max(peak, cumulativeProfit)
+    drawdown = peak - cumulativeProfit
+    maxDrawdown = max(maxDrawdown, drawdown)
+
+currentDrawdown = peak - cumulativeProfit
+```
+
+Only absolute money drawdown is exposed by Task 7.1. Percentage drawdown is not part of this endpoint.
+
+### Analytical precision and zero values
+
+Dashboard calculations must use `BigDecimal` throughout.
+
+| Result type | Scale | Rounding |
+| --- | ---: | --- |
+| Money: `totalStake`, `totalProfit`, `maxDrawdown`, `currentDrawdown` | 2 | `HALF_UP` |
+| Percentages: `roi`, `yield`, `winRate` | 2 | `HALF_UP` |
+| `averageOdds` | 4 | `HALF_UP` |
+
+Aggregation must use the stored row precision and round only at the final result boundary. Counts are integers.
+
+When an eligible set or denominator is empty or zero, return numeric zero at the metric's documented scale. Negative profit, ROI, and yield are valid and must not be clamped.
+
 ## Acceptance criteria
 
 * [ ] Stake uses `BigDecimal`.

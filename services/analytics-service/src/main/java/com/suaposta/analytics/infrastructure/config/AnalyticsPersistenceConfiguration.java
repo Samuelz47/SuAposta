@@ -3,6 +3,7 @@ package com.suaposta.analytics.infrastructure.config;
 import com.suaposta.analytics.application.port.out.AnalyticsBetRepository;
 import com.suaposta.analytics.application.port.out.ProcessedEventRepository;
 import com.suaposta.analytics.application.service.BettingEventProcessor;
+import com.suaposta.analytics.application.service.DashboardSummaryService;
 import com.suaposta.analytics.infrastructure.persistence.JdbcAnalyticsBetRepository;
 import com.suaposta.analytics.infrastructure.persistence.JdbcProcessedEventRepository;
 import java.time.Clock;
@@ -65,5 +66,10 @@ public class AnalyticsPersistenceConfiguration {
             ProcessedEventRepository processedEventRepository,
             Clock analyticsClock) {
         return new BettingEventProcessor(analyticsBetRepository, processedEventRepository, analyticsClock);
+    }
+
+    @Bean
+    DashboardSummaryService dashboardSummaryService(AnalyticsBetRepository analyticsBetRepository) {
+        return new DashboardSummaryService(analyticsBetRepository);
     }
 }

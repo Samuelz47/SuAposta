@@ -294,6 +294,8 @@ It consumes betting events from RabbitMQ and builds analytical views based on be
 - Won bets
 - Lost bets
 - Void bets
+- Cashout bets
+- Cancelled bets
 - Current drawdown
 - Maximum drawdown
 
@@ -859,13 +861,10 @@ profit = custom cashout result
 For PENDING bets:
 
 ```text
-profit = null or 0 for aggregation purposes, depending on the query
+profit = null
 ```
 
-Recommendation:
-
-- Store `profit` as null while the bet is pending.
-- Exclude pending bets from profit, ROI, yield, and drawdown calculations.
+Dashboard aggregation never converts pending profit into a financial result. Pending rows are excluded from financial, rate, average-odds, and drawdown calculations.
 
 ---
 
@@ -903,7 +902,7 @@ returnAmount = stake + profit
 ROI = (totalProfit / totalStake) * 100
 ```
 
-Only settled bets should be included.
+For dashboard aggregation, `totalProfit` and `totalStake` include only `WON`, `LOST`, and `CASHOUT` rows.
 
 ---
 
@@ -914,6 +913,8 @@ Yield = (totalProfit / totalStake) * 100
 ```
 
 For this project, ROI and Yield may initially use the same formula.
+
+For the first version, they do use the same formula and status eligibility. Their percentage scale is `2` with `HALF_UP`.
 
 Later, they may be separated if the product defines ROI based on bankroll allocation and Yield based only on betting turnover.
 
@@ -927,35 +928,38 @@ Win Rate = (wonBets / totalResolvedBets) * 100
 
 VOID and CANCELLED bets should not count as wins or losses.
 
+`CASHOUT` and `PENDING` also do not count as wins or losses. The dashboard denominator contains only `WON` and `LOST` rows.
+
 ---
 
 ### Drawdown
 
-Drawdown measures the decline from a previous bankroll peak.
+Drawdown measures the decline from a previous peak of cumulative profit.
+
+The first dashboard version uses a zero baseline because initial bankroll is not yet part of Task 7.1.
 
 Basic algorithm:
 
 ```text
-peak = initialBankroll
+currentProfit = 0
+peak = 0
 maxDrawdown = 0
 
-for each settled bet ordered by settledAt:
-    currentBankroll += profit
+for each WON, LOST, or CASHOUT bet ordered by settledAt, then betId:
+    currentProfit += profit
 
-    if currentBankroll > peak:
-        peak = currentBankroll
+    if currentProfit > peak:
+        peak = currentProfit
 
-    drawdown = peak - currentBankroll
+    drawdown = peak - currentProfit
 
     if drawdown > maxDrawdown:
         maxDrawdown = drawdown
+
+currentDrawdown = peak - currentProfit
 ```
 
-Drawdown percentage:
-
-```text
-drawdownPercentage = (drawdown / peak) * 100
-```
+Task 7.1 exposes absolute money drawdown only. The complete status matrix, average-odds formula, count rules, scales, rounding, and zero-denominator behavior are canonical in `docs/domain.md`.
 
 ---
 
