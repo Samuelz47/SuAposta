@@ -465,6 +465,75 @@ Aggregation must use the stored row precision and round only at the final result
 
 When an eligible set or denominator is empty or zero, return numeric zero at the metric's documented scale. Negative profit, ROI, and yield are valid and must not be clamped.
 
+## Bankroll evolution contract
+
+This section is the source of truth for Task 7.2, `GET /analytics/bankroll-evolution`. It defines a cumulative performance series over `analytics_bets`; it does not define an account balance or a financial ledger.
+
+### Eligible projections and points
+
+Bankroll evolution includes only projections with these statuses:
+
+```text
+WON
+LOST
+CASHOUT
+```
+
+The following statuses are excluded and must not create points or affect cumulative values:
+
+```text
+PENDING
+VOID
+CANCELLED
+```
+
+Each eligible bet generates exactly one point. Points must not be grouped by date, time, sport, league, market, or any other period or dimension. Two eligible bets settled at the same instant still generate two points.
+
+The point's `profit` comes from the persisted Analytics projection. Analytics must not recalculate settlement profit from `stake`, `odds`, `status`, or `returnAmount`.
+
+### Chronological ordering
+
+Order eligible projections by:
+
+```text
+settledAt ascending, then betId ascending
+```
+
+The `betId` tie-breaker is mandatory for equal `settledAt` values and makes the series deterministic. This ordering is normative for Task 7.2, independently of the same ordering rule documented for Task 7.1 drawdown.
+
+### Date filters
+
+Bankroll-evolution date filters apply to `settledAt`:
+
+```text
+startDate: settledAt >= startDate
+endDate:   settledAt <= endDate
+```
+
+Both limits are inclusive. Query values use ISO-8601 instant format and are parsed as `Instant`; offset-bearing values that represent the same instant are equivalent. When both values are supplied, `startDate` greater than `endDate` is invalid and the API returns `400 Bad Request`.
+
+Date and dimension filters are applied before status eligibility, ordering, and cumulative calculation. Supplied filters compose with logical `AND` and never bypass authenticated-user ownership.
+
+### Cumulative profit and bankroll
+
+There is no persisted initial bankroll in this version. The internal calculation baseline is `0.00`, and the API must not return an artificial initial point with zero values.
+
+For the filtered eligible projections in documented order:
+
+```text
+cumulativeProfit = 0.00
+
+for each eligible projection:
+    cumulativeProfit = cumulativeProfit + projection.profit
+    point.profit = projection.profit
+    point.cumulativeProfit = cumulativeProfit
+    point.bankroll = cumulativeProfit
+```
+
+In Task 7.2, `bankroll` is the public name for cumulative performance from the zero baseline. It does not represent a real account balance. Negative cumulative values are valid and must not be clamped. A zero-profit eligible bet still generates its point.
+
+If no eligible projection matches, return a successful response with an empty `points` array.
+
 ## Acceptance criteria
 
 * [ ] Stake uses `BigDecimal`.

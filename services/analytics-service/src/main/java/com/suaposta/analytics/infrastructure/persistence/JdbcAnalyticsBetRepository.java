@@ -1,6 +1,7 @@
 package com.suaposta.analytics.infrastructure.persistence;
 
 import com.suaposta.analytics.application.model.AnalyticsBet;
+import com.suaposta.analytics.application.model.BankrollEvolutionFilters;
 import com.suaposta.analytics.application.model.DashboardFilters;
 import com.suaposta.analytics.application.port.out.AnalyticsBetRepository;
 import com.suaposta.messaging.contract.BetStatus;
@@ -41,6 +42,20 @@ public final class JdbcAnalyticsBetRepository implements AnalyticsBetRepository 
         var parameters = new ArrayList<>();
         parameters.add(userId);
         appendFilters(sql, parameters, filters);
+        return jdbcTemplate.query(sql.toString(), JdbcAnalyticsBetRepository::mapRow, parameters.toArray());
+    }
+
+    @Override
+    public List<AnalyticsBet> findBankrollEvolutionBets(UUID userId, BankrollEvolutionFilters filters) {
+        var sql = new StringBuilder(SELECT_COLUMNS)
+                .append("where user_id = ? and status in (?, ?, ?)");
+        var parameters = new ArrayList<>();
+        parameters.add(userId);
+        parameters.add(BetStatus.WON.name());
+        parameters.add(BetStatus.LOST.name());
+        parameters.add(BetStatus.CASHOUT.name());
+        appendBankrollEvolutionFilters(sql, parameters, filters);
+        sql.append(" order by settled_at asc, bet_id asc");
         return jdbcTemplate.query(sql.toString(), JdbcAnalyticsBetRepository::mapRow, parameters.toArray());
     }
 
@@ -125,6 +140,20 @@ public final class JdbcAnalyticsBetRepository implements AnalyticsBetRepository 
         append(sql, parameters, "odds <= ?", filters.maxOdds());
         append(sql, parameters, "stake >= ?", filters.minStake());
         append(sql, parameters, "stake <= ?", filters.maxStake());
+    }
+
+    private static void appendBankrollEvolutionFilters(
+            StringBuilder sql, List<Object> parameters, BankrollEvolutionFilters filters) {
+        append(sql, parameters, "settled_at >= ?", offset(filters.startDate()));
+        append(sql, parameters, "settled_at <= ?", offset(filters.endDate()));
+        append(sql, parameters, "sport = ?", filters.sport());
+        append(sql, parameters, "league = ?", filters.league());
+        if (filters.team() != null) {
+            sql.append(" and (home_team = ? or away_team = ?)");
+            parameters.add(filters.team());
+            parameters.add(filters.team());
+        }
+        append(sql, parameters, "market = ?", filters.market());
     }
 
     private static void append(StringBuilder sql, List<Object> parameters, String predicate, Object value) {

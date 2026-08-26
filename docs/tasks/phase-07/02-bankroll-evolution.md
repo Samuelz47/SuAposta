@@ -158,36 +158,35 @@ Cross-user projections must never affect:
 
 ## Eligible bets
 
-Only statuses documented as eligible for bankroll/performance evolution may participate.
+Bankroll evolution uses only settled performance projections with these statuses:
 
-The task description defines bankroll evolution from settled performance bets.
+```text
+WON
+LOST
+CASHOUT
+```
 
-The implementation must explicitly follow the documented treatment of:
+The following statuses are excluded:
 
-- `WON`;
-- `LOST`;
-- `VOID`;
-- `CASHOUT`;
-- `CANCELLED`;
-- `PENDING`.
+```text
+PENDING
+VOID
+CANCELLED
+```
 
-Do not assume every non-PENDING status changes bankroll.
+Excluded statuses must not create points and must not affect cumulative values. This is the explicit Task 7.2 eligibility contract; do not infer it from another Task 7.1 metric.
 
-Do not reuse the Task 7.1 metric status sets blindly if bankroll evolution has different documented eligibility.
+Each eligible bet generates exactly one point. Do not group points by date, time, sport, league, market, or any other period or dimension. Two eligible bets with the same settlement timestamp still generate two points.
 
 ## Pending bets
 
-`PENDING` bets must not create bankroll evolution points unless explicitly documented otherwise.
+`PENDING` bets must not create bankroll evolution points.
 
 A pending projection has no realized performance and must not accidentally affect cumulative profit.
 
 ## VOID and CANCELLED
 
-`VOID` and `CANCELLED` must participate only according to documented bankroll evolution semantics.
-
-Do not automatically create zero-value points for them unless the contract says those settled outcomes must be represented.
-
-Do not automatically exclude them if the contract explicitly includes them.
+`VOID` and `CANCELLED` are excluded from bankroll evolution. They must not create zero-value points and must not affect cumulative profit.
 
 ## CASHOUT
 
@@ -219,11 +218,13 @@ Task 7.2 aggregates those values.
 
 ## Chronological ordering
 
-Points must be ordered by the timestamp documented for bankroll evolution.
+Points must be ordered by:
 
-The task context establishes `settledAt` as the chronological settlement timestamp.
+```text
+settledAt ascending, then betId ascending
+```
 
-Use the documented ordering semantics for `settledAt`.
+`settledAt` is the chronological settlement timestamp. The `betId` tie-breaker is mandatory when settlement timestamps are equal.
 
 Do not order primarily by:
 
@@ -231,55 +232,33 @@ Do not order primarily by:
 - `createdAt`;
 - `updatedAt`;
 
-unless the source-of-truth documents explicitly override this task contract.
-
 ## Same-date / same-timestamp bets
 
-Multiple eligible bets may share the same settlement date or timestamp.
-
-The implementation must return a deterministic result.
-
-If `docs/domain.md` or `docs/api-contracts.md` defines a tie-break rule, follow it exactly.
-
-If deterministic ordering between identical timestamps is required but no tie-break is documented, stop and report the ambiguity rather than inventing a business rule.
-
-Do not depend on incidental database row order.
+Multiple eligible bets may share the same settlement date or timestamp. Each still produces one point. Equal `settledAt` values are ordered by `betId` ascending, so the result is deterministic and does not depend on incidental database row order.
 
 ## Cumulative calculation
 
 For eligible bets ordered according to the contract, calculate cumulative profit sequentially.
 
-Conceptually:
+The internal baseline is `0.00`. For the filtered eligible bets in documented order:
 
 ```text
-cumulative[0] = initial value + profit[0]
+cumulativeProfit = 0.00
 
-cumulative[n] = cumulative[n - 1] + profit[n]
+for each eligible projection:
+    cumulativeProfit = cumulativeProfit + projection.profit
+    point.profit = projection.profit
+    point.cumulativeProfit = cumulativeProfit
+    point.bankroll = cumulativeProfit
 ```
 
-Use the exact documented initial-value behavior.
-
-Do not reset cumulative values between points unless a documented filter/domain boundary requires it.
+Filtering happens before this calculation, so excluded projections never contribute to the first or later cumulative values. Do not reset cumulative values between points.
 
 ## Zero-based initial bankroll
 
-The current MVP scope may use a zero-based initial bankroll.
+This version has no persisted initial bankroll. The internal baseline is `0.00`; it exists only for the calculation and must not be returned as an artificial point.
 
-When applicable, the initial cumulative baseline is:
-
-```text
-0
-```
-
-and each point reflects accumulated realized profit from that baseline.
-
-Do not invent an initial deposit or configured bankroll.
-
-If the API contract returns an explicit initial zero point, preserve it.
-
-If the contract returns only points associated with settled bets, do not invent an extra point.
-
-The exact response shape remains defined by `docs/api-contracts.md`.
+The public `bankroll` field is equal to `cumulativeProfit`. In Task 7.2 it means cumulative performance from the zero baseline, not a real account balance.
 
 ## Negative bankroll values
 
@@ -300,13 +279,7 @@ This task models performance evolution, not account solvency constraints.
 
 ## Zero-profit events
 
-An eligible settled bet may have zero profit.
-
-If the contract says every eligible settlement produces a point, a zero-profit settlement must still produce the documented point.
-
-Do not silently remove it merely because the cumulative value does not change.
-
-If zero-profit statuses are excluded by the documented eligibility rules, follow those rules instead.
+An eligible settled bet may have zero profit. It must still produce its point, even when the cumulative value does not change.
 
 ## Financial precision
 
@@ -342,11 +315,7 @@ If the authenticated user has no eligible settled projections, return the docume
 
 Do not fail because no rows exist.
 
-Depending on the API contract, the result may be:
-
-- an empty list;
-- a response containing an empty `points` array;
-- another explicitly documented empty representation.
+The successful response contains an empty `points` array.
 
 Do not invent a synthetic settlement.
 
@@ -374,7 +343,7 @@ Do not calculate a global cumulative series and then remove points afterward if 
 
 ## Filtered cumulative semantics
 
-A filtered bankroll evolution represents the cumulative performance of the filtered dataset unless the API/domain contract explicitly defines otherwise.
+A filtered bankroll evolution represents the cumulative performance of the filtered dataset.
 
 Therefore, when filters select a subset, the cumulative series must be calculated from that eligible subset in documented order.
 
@@ -397,21 +366,22 @@ Ownership must always remain mandatory.
 
 ## Date filters
 
-If the API exposes date-range filters for bankroll evolution, apply them to the timestamp defined by the contract.
+The date filters apply to `settledAt`:
 
-Given the purpose of this task, `settledAt` is the expected chronology field unless source-of-truth documentation states otherwise.
+```text
+startDate: settledAt >= startDate
+endDate:   settledAt <= endDate
+```
 
-Do not silently apply the filter to:
+Both limits are inclusive. Query values use ISO-8601 instant format and are parsed as `Instant`; offset-bearing values representing the same instant are equivalent. When both are supplied, `startDate > endDate` is invalid and returns `400 Bad Request`.
 
-- placed date;
-- projection creation date;
-- projection update date.
+Malformed date values return `400 Bad Request` using the standard validation error response.
 
-Respect documented inclusive/exclusive boundaries.
+Do not apply the date filters to `placedAt`, projection creation time, or projection update time.
 
 ## Text/dimension filters
 
-If bankroll evolution supports filters such as:
+Bankroll evolution supports these dimension filters:
 
 - sport;
 - league;
@@ -451,7 +421,11 @@ The cumulative rule should remain testable.
 
 ## Query ordering
 
-If persistence provides ordered projections, the query must explicitly order according to the documented chronology.
+The persistence query must explicitly order projections by:
+
+```text
+settledAt ASC, betId ASC
+```
 
 Do not rely on:
 
@@ -471,17 +445,16 @@ Do not leak internal projection identifiers unless explicitly part of the contra
 
 ## Point representation
 
-Each returned point must contain exactly the fields documented by the API contract.
+Each returned point must contain exactly these public fields:
 
-Possible conceptual fields may include:
+```text
+date
+profit
+cumulativeProfit
+bankroll
+```
 
-- timestamp/date;
-- profit;
-- cumulative profit/bankroll.
-
-Do not treat this conceptual list as authority if `docs/api-contracts.md` defines a different exact shape.
-
-The API contract is authoritative.
+The `profit` field is the persisted projected profit. `cumulativeProfit` is the sequential sum after filtering and ordering. `bankroll` is equal to `cumulativeProfit`. The point representation must not expose `betId` or other internal projection identifiers.
 
 ## Authentication boundary
 
@@ -810,10 +783,16 @@ Task 7.2 is complete only when:
 
 | Field | Value |
 | --- | --- |
-| Status | `PLANNED` |
-| Red tests | Not started |
-| Human test approval | Pending |
-| Implementation | Not started |
-| Human implementation approval | Pending |
-| Final QA | Pending |
-| Evidence | Pending |
+| Status | `DONE` |
+| Red tests | Created: `Task72BankrollEvolutionCalculationTest`, `Task72BankrollEvolutionApiIntegrationTest`, `Task72BankrollEvolutionArchitectureBoundaryTest` |
+| Human test approval | Approved |
+| Implementation | Green |
+| Human implementation approval | Approved |
+| Final QA | `APPROVED WITH RESERVATIONS`; human approved the QA outcome on 2026-08-25 |
+| Evidence | RED review approved: `./gradlew :services:analytics-service:test --tests '*Task72*' --rerun-tasks` previously reported 9 expected REDs (7 API boundary/404, 2 application boundary) and 4 architecture tests green. Independent QA focused execution passes 18 runtime Task72 tests (11 API, 5 architecture, 2 application); `./gradlew :services:analytics-service:test --rerun-tasks`, `./gradlew :services:analytics-service:check --rerun-tasks`, `./gradlew :libs:messaging-contract:test --rerun-tasks`, the Betting/Auth/Gateway checks, and `./gradlew check --rerun-tasks` all pass. Revalidation confirmed authenticated identity is checked before filter validation in `BankrollEvolutionController`. The remaining documented reservation is that protected Task72 files are untracked and have no Git baseline for semantic diff comparison; the human explicitly accepted this reservation. Human implementation diff review approved; new production files are exposed only with `git add -N`. |
+
+### QA report
+
+VERDICT: APPROVED WITH RESERVATIONS
+
+Human approval: approved on 2026-08-25; task finalized as `DONE`.

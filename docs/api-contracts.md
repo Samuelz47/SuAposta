@@ -849,13 +849,13 @@ market
       "date": "2026-07-01",
       "profit": 50.00,
       "cumulativeProfit": 50.00,
-      "bankroll": 1050.00
+      "bankroll": 50.00
     },
     {
       "date": "2026-07-02",
       "profit": -100.00,
       "cumulativeProfit": -50.00,
-      "bankroll": 950.00
+      "bankroll": -50.00
     }
   ]
 }
@@ -864,8 +864,25 @@ market
 ### Rules
 
 - Requires authentication.
-- Data should be ordered by date.
-- Initial version may use cumulative profit if initial bankroll is not implemented yet.
+- Must return only projections belonging to the authenticated user.
+- All supplied query parameters are optional and compose with logical `AND`.
+- `startDate` filters with `settledAt >= startDate`.
+- `endDate` filters with `settledAt <= endDate`.
+- `startDate` and `endDate` are inclusive and must be parsed as ISO-8601 instants. Offset-bearing values representing the same instant are equivalent.
+- Malformed date values return `400 Bad Request` using the standard validation error response.
+- When both date filters are supplied, `startDate` greater than `endDate` returns `400 Bad Request`.
+- Date and dimension filters are applied before status eligibility, ordering, and cumulative calculation. A filtered series starts its cumulative calculation at zero and must not include profit from excluded projections.
+- Dimension filters use the same exact matching semantics as the Analytics dashboard: `sport`, `league`, and `market` are exact case-sensitive matches; `team` matches exactly either `homeTeam` or `awayTeam`.
+- Only `WON`, `LOST`, and `CASHOUT` projections are eligible.
+- `PENDING`, `VOID`, and `CANCELLED` projections are excluded and do not create points or affect cumulative values.
+- Each eligible bet generates exactly one point. Points are not grouped by date or any other period; multiple eligible bets may therefore have the same public `date`.
+- Points are ordered by `settledAt ASC`, then `betId ASC`. The `betId` tie-breaker is mandatory when settlement timestamps are equal; database row order must not be used.
+- Each point's `profit` is the persisted Analytics projection value. Analytics must not recalculate settlement profit.
+- The internal baseline is `0.00`; no artificial initial zero point is returned.
+- `cumulativeProfit` is the sequential sum of eligible projected profits after filtering.
+- `bankroll` is equal to `cumulativeProfit` in this MVP. It is cumulative performance from a zero baseline, not a real account balance.
+- Negative cumulative values are valid, and an eligible zero-profit bet still produces a point.
+- If no eligible projections match, return `200 OK` with `{"points": []}`.
 
 ---
 
