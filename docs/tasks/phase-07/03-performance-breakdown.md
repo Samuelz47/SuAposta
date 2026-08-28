@@ -165,22 +165,31 @@ Cross-user records must never affect:
 
 ## groupBy contract
 
-The endpoint must accept only the grouping dimensions explicitly documented in `docs/api-contracts.md`.
+The endpoint is:
 
-Examples of possible analytical dimensions may include:
+```http
+GET /analytics/performance/breakdown
+```
 
-- sport;
-- league;
-- team;
-- market.
+`groupBy` is required and accepts exactly these case-sensitive values:
 
-This list is conceptual only.
+```text
+SPORT
+LEAGUE
+TEAM
+MARKET
+MONTH
+WEEK
+DAY
+```
 
-Do not treat a dimension as supported unless the API contract explicitly defines it.
+Matching is exact. The implementation must not trim, normalize, case-fold, or
+otherwise reinterpret the value. `sport`, `Sport`, `" SPORT "`, and unknown
+values are invalid.
 
 ## Invalid groupBy
 
-An unsupported `groupBy` must return:
+An unsupported, blank, or otherwise invalid `groupBy` must return:
 
 ```text
 400
@@ -197,35 +206,88 @@ Do not:
 
 ## Missing groupBy
 
-If the API contract requires `groupBy`, a missing value must produce the documented client error.
-
-If a default grouping is explicitly documented, use only that documented default.
-
-Do not invent one.
+`groupBy` is mandatory. A missing value must return `400 Bad Request`. There is
+no default grouping.
 
 ## Grouping behavior
 
 For each valid grouping dimension:
 
 ```text
-authenticated user's projections
+authenticated user's analytics_bets
         ↓
-documented filters
+filters
         ↓
-metric-specific eligibility
+grouping
         ↓
-group by requested dimension
-        ↓
-calculate documented metrics per group
+metric calculation per bucket
 ```
 
-Each projection must participate only in the group implied by its documented dimension value.
+Filters must be applied before grouping and metric calculation. Each metric is
+then calculated independently within each bucket.
 
-Do not duplicate one projection across multiple groups unless the source-of-truth contract explicitly defines that behavior.
+For `SPORT`, `LEAGUE`, and `MARKET`, each projection belongs to one bucket
+identified by the corresponding persisted value. For `TEAM`, one projection may
+contribute to both its `homeTeam` and `awayTeam` buckets, as defined below.
+
+### SPORT grouping
+
+`SPORT` uses exactly `AnalyticsBet.sport`. Each bet belongs to one SPORT bucket
+and `name` receives the persisted `sport` value.
+
+### LEAGUE grouping
+
+`LEAGUE` uses exactly `AnalyticsBet.league`. Each bet belongs to one LEAGUE
+bucket and `name` receives the persisted `league` value.
+
+### MARKET grouping
+
+`MARKET` uses exactly `AnalyticsBet.market`. Each bet belongs to one MARKET
+bucket and `name` receives the persisted `market` value.
+
+### DAY grouping
+
+`DAY` uses `placedAt` converted to UTC. The bucket name is `YYYY-MM-DD`, and
+each bet belongs to one DAY bucket.
+
+### MONTH grouping
+
+`MONTH` uses `placedAt` converted to UTC. The bucket name is `YYYY-MM`, and each
+bet belongs to one MONTH bucket.
+
+### WEEK grouping
+
+`WEEK` uses `placedAt` converted to UTC and ISO-8601 week-based-year semantics.
+The bucket name is `YYYY-Www`, where the year is the ISO week-based-year rather
+than necessarily the calendar year. Each bet belongs to one WEEK bucket.
 
 ## Metric reuse
 
 Grouped metrics must use the same formulas and eligibility semantics established by Task 7.1.
+
+Every item contains exactly these 14 metrics:
+
+```text
+totalStake
+profit
+roi
+yield
+winRate
+avgOdds
+drawdown
+betsCount
+pendingCount
+wonCount
+lostCount
+voidCount
+cashoutCount
+cancelledCount
+```
+
+`profit` is the projected profit aggregate, `avgOdds` is the unweighted
+arithmetic mean of projected odds, and `drawdown` is the maximum absolute
+money drawdown computed within the bucket using the Task 7.1 chronology.
+`totalReturn` is not introduced.
 
 Do not introduce a second interpretation of:
 
@@ -256,6 +318,11 @@ Explicitly preserve the documented treatment of:
 - `CASHOUT`;
 - `CANCELLED`.
 
+`PENDING` contributes to `betsCount` and `pendingCount` only. `VOID` and
+`CANCELLED` contribute to `betsCount` and their own status counts only.
+`CASHOUT` participates in turnover, profit, ROI, yield, average odds, and
+drawdown using projected values, but not in win rate.
+
 ## CASHOUT
 
 Use the Analytics projection values already produced by Task 6.3.
@@ -269,43 +336,24 @@ Grouped performance aggregates projected values; it does not repeat settlement b
 
 ## Null dimension values
 
-A projection may have a null value for a grouping dimension depending on the documented schema/domain.
+For `SPORT`, `LEAGUE`, and `MARKET`, a null or blank group value does not
+create a bucket. For `TEAM`, `homeTeam` and `awayTeam` are evaluated
+independently; a null or blank value creates no contribution for that side.
 
-The behavior for null dimension values must follow `docs/domain.md` or `docs/api-contracts.md`.
-
-Possible documented behaviors could include:
-
-- exclude the record from that grouping;
-- return a dedicated null/unknown group;
-- use a documented label.
-
-Do not invent a label such as:
-
-```text
-Unknown
-N/A
-Other
-```
-
-unless explicitly documented.
-
-If null grouping behavior is not documented and the persisted schema permits it, stop and report the ambiguity.
+Do not create synthetic buckets named `UNKNOWN`, `N/A`, `null`, or the empty
+string.
 
 ## Team grouping
 
-If `team` is a supported grouping dimension, follow the exact domain/API definition of what constitutes the team value.
+`TEAM` uses exactly `homeTeam` and `awayTeam`. A bet contributes to one bucket
+for `homeTeam` and one bucket for `awayTeam` when those values are non-null and
+non-blank. `selection` never participates in TEAM grouping.
 
-Do not independently decide whether team means:
-
-- home team;
-- away team;
-- selected team;
-- either participating team;
-- normalized team name.
-
-The contract must define this.
-
-If it does not, stop and report the ambiguity.
+If `homeTeam` and `awayTeam` are exactly equal, the bet contributes only once
+to that bucket. TEAM bucket metrics represent all bets in which the team
+appears as home or away. Consequently, TEAM bucket metrics are not globally
+additive and the sum of TEAM `betsCount` values need not equal the global
+`betsCount`.
 
 ## Group identity
 
@@ -317,18 +365,10 @@ Do not normalize group values unless explicitly documented.
 
 ## Deterministic ordering
 
-Returned groups must be ordered deterministically according to `docs/api-contracts.md`.
-
-If the API contract defines ordering such as:
-
-- alphabetical;
-- descending profit;
-- descending stake;
-- explicit domain ordering;
-
-follow it exactly.
-
-If deterministic ordering is required but no ordering rule exists, stop and report the ambiguity instead of relying on database incidental order.
+For `SPORT`, `LEAGUE`, `TEAM`, and `MARKET`, order groups by `name ASC` using
+natural/exact comparison consistent with persisted values. For `DAY`, `WEEK`,
+and `MONTH`, order groups chronologically ascending. Do not depend on database
+incidental order or insertion order.
 
 ## Financial precision
 
@@ -356,6 +396,10 @@ Grouped metrics must use the same documented scale and rounding behavior as Task
 Do not round per-row values before aggregation unless the domain contract explicitly requires it.
 
 Do not invent a separate rounding mode for breakdowns.
+
+Normalize decimal results at the documented result boundary: money uses scale
+`2`, percentages use scale `2`, odds use scale `4`, and all use `HALF_UP`.
+Use `BigDecimal` for stored values, intermediate calculations, and results.
 
 ## Zero denominators
 
@@ -400,9 +444,32 @@ Do not fabricate an empty group.
 
 Do not return another user's group.
 
+The exact response is:
+
+```json
+{
+  "groupBy": "<requested valid groupBy>",
+  "items": []
+}
+```
+
+Return only groups observed after ownership and filters. Do not generate
+synthetic zero-valued groups for absent dimensions.
+
 ## Filters
 
-Support every performance-breakdown filter documented in `docs/api-contracts.md`.
+Task 7.3 accepts only these performance-breakdown filters:
+
+```text
+startDate
+endDate
+sport
+league
+market
+```
+
+It does not accept `team`, `status`, `minOdds`, `maxOdds`, `minStake`, or
+`maxStake` as breakdown filters.
 
 Filters must apply before grouping and metric calculation.
 
@@ -431,26 +498,31 @@ A filter must never replace or weaken the authenticated-user predicate.
 
 ## Date filters
 
-If date filters are supported, apply them to the exact timestamp defined by the contract.
+Task 7.3 date filters use `placedAt`:
 
-Do not independently choose:
+```text
+startDate: placedAt >= startDate
+endDate:   placedAt <= endDate
+```
 
-- placedAt;
-- settledAt;
-- createdAt;
-- updatedAt.
+Both boundaries are inclusive. Query values are ISO-8601 instants parsed as
+`Instant`; offset-bearing values representing the same instant are equivalent.
+Malformed values and `startDate > endDate` return `400 Bad Request`.
 
-If the source-of-truth documents do not define the timestamp for performance filtering, stop and report the ambiguity.
+`settledAt` is not a Task 7.3 date-filter field. It remains the chronology used
+by the Task 7.1 drawdown calculation inside each already-filtered bucket.
 
 ## Status filters
 
-If status filtering is exposed publicly, valid values must be documented.
-
-An explicit status filter must still preserve metric semantics.
-
-Do not allow an invalid status to enter calculations merely because it was passed by the client.
+Status filtering is not exposed by Task 7.3. Statuses are used only by the
+documented per-metric eligibility and status-count rules.
 
 ## Dimension filters
+
+Task 7.3 text filters are `sport`, `league`, and `market`. They use exact,
+case-sensitive equality with the persisted value. The server must not trim,
+normalize, partially match, or case-fold them. Blank values return
+`400 Bad Request`.
 
 Filters and grouping may involve the same dimension.
 
@@ -514,16 +586,28 @@ The public API should use the documented `groupBy` contract.
 
 ## Response structure
 
-Each group must expose exactly the documented response fields.
-
-Conceptually, a grouped result may contain:
+The top-level response contains exactly `groupBy` and `items`. `groupBy` echoes
+the valid requested value. Each item contains exactly `name` plus these 14
+metrics, with no additional fields:
 
 ```text
-group
-metrics...
+totalStake
+profit
+roi
+yield
+winRate
+avgOdds
+drawdown
+betsCount
+pendingCount
+wonCount
+lostCount
+voidCount
+cashoutCount
+cancelledCount
 ```
 
-but the exact response shape comes exclusively from `docs/api-contracts.md`.
+`totalReturn` is not part of the response.
 
 Do not leak:
 
@@ -533,15 +617,18 @@ Do not leak:
 
 ## Authentication boundary
 
-Use the trusted authenticated-user propagation mechanism established by the architecture.
+Use the trusted `X-User-Id` authenticated-user propagation mechanism
+established by the architecture.
 
-Missing or malformed authentication identity must return the documented unauthorized response.
+Missing or malformed UUID identity must return `401 Unauthorized`. Identity
+validation has precedence over filter and `groupBy` validation: a request with
+both an absent/malformed `X-User-Id` and an invalid filter must return `401`.
 
-Never accept user ownership from:
+Ownership comes only from `X-User-Id`. Never accept it from:
 
 - request body;
 - public query `userId`;
-- untrusted arbitrary header.
+- any other client-controlled field.
 
 ## Error handling
 
@@ -648,8 +735,10 @@ The following are explicitly outside Task 7.3:
 
 - [ ] Every documented `groupBy` value is supported.
 - [ ] Unsupported `groupBy` returns the documented `400` response.
-- [ ] Missing `groupBy` follows the documented validation behavior.
+- [ ] Missing or blank `groupBy` returns `400`, with no trimming or normalization.
 - [ ] Each projection is assigned according to the documented grouping semantics.
+- [ ] TEAM uses `homeTeam` and `awayTeam`, never `selection`, and suppresses a duplicate same-team contribution.
+- [ ] DAY, MONTH, and WEEK use UTC `placedAt`, including ISO week-based-year semantics for WEEK.
 - [ ] Null dimension behavior follows the documented contract.
 - [ ] Returned groups are ordered deterministically according to the API contract.
 
@@ -661,8 +750,9 @@ The following are explicitly outside Task 7.3:
 - [ ] ROI is correct per group.
 - [ ] Yield is correct per group.
 - [ ] Win rate is correct per group.
-- [ ] Average odds is correct per group.
-- [ ] Documented counts are correct per group.
+- [ ] `avgOdds` is correct per group.
+- [ ] `drawdown` follows Task 7.1 chronology within each bucket.
+- [ ] `betsCount`, `pendingCount`, `wonCount`, `lostCount`, `voidCount`, `cashoutCount`, and `cancelledCount` are correct per group.
 - [ ] Metric-specific status eligibility remains correct.
 
 ### Ownership
@@ -674,10 +764,12 @@ The following are explicitly outside Task 7.3:
 
 ### Filters
 
-- [ ] Every documented performance filter is supported.
+- [ ] Only `startDate`, `endDate`, `sport`, `league`, and `market` are supported as performance filters.
 - [ ] Filters are applied before grouping/aggregation.
 - [ ] Multiple filters compose correctly.
 - [ ] Filters do not bypass ownership.
+- [ ] Date filters use inclusive `placedAt` ISO-8601 instant boundaries and reject malformed values and invalid ranges.
+- [ ] Text filters are exact, case-sensitive, non-blank, and are not trimmed, normalized, or partially matched.
 - [ ] Filters with no matches return the documented empty result.
 - [ ] Invalid filter values return the documented client error.
 
@@ -701,8 +793,9 @@ The following are explicitly outside Task 7.3:
 ### API
 
 - [ ] Response structure matches `docs/api-contracts.md`.
+- [ ] The top-level response contains exactly `groupBy` and `items`, and each item contains exactly `name` plus the 14 documented metrics.
 - [ ] Invalid `groupBy` returns `400`.
-- [ ] Missing authenticated identity returns documented unauthorized behavior.
+- [ ] Missing or malformed `X-User-Id` returns `401` before filter validation.
 - [ ] Empty results remain successful when defined by contract.
 - [ ] Internal persistence details are not exposed.
 
@@ -723,16 +816,19 @@ Tests must cover at least the documented variants of:
 - null grouping dimension;
 - valid grouping;
 - every supported grouping dimension;
-- invalid grouping;
-- missing grouping where required;
+- invalid, blank, and missing grouping;
+- case-sensitive grouping values without trimming or normalization;
 - cross-user data;
 - single filter;
 - multiple filters;
 - filters with no matches;
+- malformed date, reversed date range, and equivalent instant offsets;
+- blank, partial, normalized, and case-variant text filters;
+- invalid identity taking precedence over invalid filters;
 - grouping and filtering by different dimensions;
 - decimal values requiring documented rounding.
 
-If team grouping exists, tests must explicitly protect its documented semantics.
+TEAM tests must explicitly protect its documented home/away semantics.
 
 Do not invent unsupported grouping behavior merely to increase coverage.
 
@@ -794,7 +890,7 @@ Protect:
 - authenticated request;
 - every supported `groupBy`;
 - invalid `groupBy`;
-- missing `groupBy` where applicable;
+- missing `groupBy`;
 - filters;
 - metric values;
 - response structure;
@@ -874,10 +970,10 @@ Task 7.3 is complete only when:
 
 | Field | Value |
 | --- | --- |
-| Status | `PLANNED` |
-| Red tests | Not started |
-| Human test approval | Pending |
-| Implementation | Not started |
-| Human implementation approval | Pending |
-| Final QA | Pending |
-| Evidence | Pending |
+| Status | `DONE` |
+| Red tests | Approved. Created in `Task73PerformanceBreakdownApiIntegrationTest`, `Task73PerformanceBreakdownCalculationTest`, `Task73PerformanceBreakdownArchitectureBoundaryTest`, and `Task73TestSupport`. |
+| Human test approval | Approved |
+| Implementation | Green — protected Task 7.3 tests passed (46/46), and all required focused, service, external-service, and two root regressions passed. |
+| Human implementation approval | Approved on 2026-08-27. |
+| Final QA | `APPROVED WITH RESERVATIONS`; human approved the QA outcome and authorized finalization on 2026-08-27. |
+| Evidence | Initial RED: `compileTestJava` passed; 45 Task 7.3 tests produced 41 expected failures (40 endpoint `404`s and one missing application seam), with four architecture tests Green. The implementer corrected canonical `X-User-Id` UUID validation and added the approved regression for non-canonical UUID input; the protected Task73 suite then passed 46/46. Task 7.2, Task 7.1, Task 6.3, full Analytics test/check, messaging-contract, Betting, Auth, Gateway, and root checks passed. No protected expectation was weakened, no dependency or migration was added, and new production files were exposed only with `git add -N`. Human approved the implementation diff and the QA reservation on 2026-08-27. |

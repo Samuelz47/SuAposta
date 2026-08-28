@@ -5,6 +5,7 @@ import com.suaposta.analytics.application.port.out.ProcessedEventRepository;
 import com.suaposta.analytics.application.service.BettingEventProcessor;
 import com.suaposta.analytics.application.service.BankrollEvolutionService;
 import com.suaposta.analytics.application.service.DashboardSummaryService;
+import com.suaposta.analytics.application.service.PerformanceBreakdownService;
 import com.suaposta.analytics.infrastructure.persistence.JdbcAnalyticsBetRepository;
 import com.suaposta.analytics.infrastructure.persistence.JdbcProcessedEventRepository;
 import java.time.Clock;
@@ -77,5 +78,10 @@ public class AnalyticsPersistenceConfiguration {
     @Bean
     BankrollEvolutionService bankrollEvolutionService(AnalyticsBetRepository analyticsBetRepository) {
         return new BankrollEvolutionService(analyticsBetRepository);
+    }
+
+    @Bean
+    PerformanceBreakdownService performanceBreakdownService(AnalyticsBetRepository analyticsBetRepository) {
+        return new PerformanceBreakdownService(analyticsBetRepository);
     }
 }

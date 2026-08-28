@@ -465,6 +465,94 @@ Aggregation must use the stored row precision and round only at the final result
 
 When an eligible set or denominator is empty or zero, return numeric zero at the metric's documented scale. Negative profit, ROI, and yield are valid and must not be clamped.
 
+## Performance breakdown aggregation contract
+
+This section is the source of truth for Task 7.3, exposed by:
+
+```text
+GET /analytics/performance/breakdown
+```
+
+Task 7.3 reads only the authenticated user's `analytics_bets` projections. It
+first applies the documented ownership and filters, then groups the remaining
+rows, and finally calculates metrics independently inside each bucket. It does
+not recalculate settlement values; persisted projected values remain
+authoritative.
+
+### Breakdown metric vocabulary
+
+Every item contains exactly these 14 metrics. Their semantics are the Task 7.1
+semantics applied to the bucket's rows:
+
+This breakdown vocabulary does not rename or alter the historical Task 7.1
+`GET /analytics/dashboard` response. The names below are the exact public field
+names for Task 7.3.
+
+| Metric | Meaning and eligibility |
+| --- | --- |
+| `totalStake` | Sum of `stake` for `WON`, `LOST`, and `CASHOUT`. Money scale `2`. |
+| `profit` | Sum of projected `profit` for `WON`, `LOST`, and `CASHOUT`. Money scale `2`. |
+| `roi` | `(profit × 100) / totalStake`, or `0.00` when eligible stake is zero; scale `2`. |
+| `yield` | Exactly the same formula and value as `roi`. |
+| `winRate` | `(WON × 100) / (WON + LOST)`, or `0.00` when the denominator is zero; scale `2`. |
+| `avgOdds` | Unweighted mean of projected `odds` for `WON`, `LOST`, and `CASHOUT`; `0.0000` when none are eligible; scale `4`. |
+| `drawdown` | Maximum absolute drawdown of the eligible `WON`, `LOST`, and `CASHOUT` rows, using the Task 7.1 chronology within the bucket; money scale `2`. |
+| `betsCount` | Count of every row in the filtered bucket, including `PENDING`, `VOID`, and `CANCELLED`. |
+| `pendingCount` | Count of rows with status `PENDING`. |
+| `wonCount` | Count of rows with status `WON`. |
+| `lostCount` | Count of rows with status `LOST`. |
+| `voidCount` | Count of rows with status `VOID`. |
+| `cashoutCount` | Count of rows with status `CASHOUT`. |
+| `cancelledCount` | Count of rows with status `CANCELLED`. |
+
+`PENDING` contributes only to `betsCount` and `pendingCount`. `VOID` and
+`CANCELLED` contribute to `betsCount` and their own status counts, but not to
+financial, percentage, odds-average, or drawdown metrics. `CASHOUT` contributes
+to financial, percentage, odds-average, and drawdown metrics using projected
+`stake` and `profit`, but is excluded from the win-rate numerator and
+denominator.
+
+For each bucket, `roi`, `yield`, and `winRate` use `BigDecimal`; multiplication
+by `100` occurs before division; final percentage values use scale `2` and
+`HALF_UP`. Money values use scale `2` and `HALF_UP`; odds use scale `4` and
+`HALF_UP`. Aggregation uses stored row precision and rounds only at the final
+result boundary. Zero denominators produce numeric zero at the metric's
+documented scale. `totalReturn` is not a breakdown metric.
+
+### Breakdown drawdown chronology
+
+The `drawdown` value uses only eligible `WON`, `LOST`, and `CASHOUT` rows in the
+bucket. Order them by `settledAt ASC`, then `betId ASC`, and calculate from a
+`0.00` baseline:
+
+```text
+cumulativeProfit = 0.00
+peak = 0.00
+drawdown = 0.00
+
+for each eligible row:
+    cumulativeProfit = cumulativeProfit + row.profit
+    peak = max(peak, cumulativeProfit)
+    drawdown = max(drawdown, peak - cumulativeProfit)
+```
+
+The calculation is restarted independently for every bucket. It is not a
+percentage and does not use `placedAt` ordering.
+
+### Breakdown date filters
+
+Task 7.3 date filters use `placedAt`, not `settledAt`:
+
+```text
+startDate: placedAt >= startDate
+endDate:   placedAt <= endDate
+```
+
+Both boundaries are inclusive. Values are ISO-8601 instants parsed as
+`Instant`; equivalent offsets represent the same instant. Malformed values and
+`startDate > endDate` are invalid. The `settledAt` chronology above remains the
+drawdown chronology after filtering and does not change the date-filter field.
+
 ## Bankroll evolution contract
 
 This section is the source of truth for Task 7.2, `GET /analytics/bankroll-evolution`. It defines a cumulative performance series over `analytics_bets`; it does not define an account balance or a financial ledger.

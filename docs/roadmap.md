@@ -92,7 +92,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 | --- | --- | --- |
 | 7.1 Calculate dashboard summary metrics | `tasks/phase-07/01-dashboard-summary.md` | DONE |
 | 7.2 Expose bankroll evolution | `tasks/phase-07/02-bankroll-evolution.md` | DONE |
-| 7.3 Expose filtered performance breakdowns | `tasks/phase-07/03-performance-breakdown.md` | PLANNED |
+| 7.3 Expose filtered performance breakdowns | `tasks/phase-07/03-performance-breakdown.md` | DONE |
 
 ## 10. Phase 8 — Angular frontend MVP
 

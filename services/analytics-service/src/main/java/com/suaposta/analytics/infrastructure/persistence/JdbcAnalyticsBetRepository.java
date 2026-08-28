@@ -3,6 +3,7 @@ package com.suaposta.analytics.infrastructure.persistence;
 import com.suaposta.analytics.application.model.AnalyticsBet;
 import com.suaposta.analytics.application.model.BankrollEvolutionFilters;
 import com.suaposta.analytics.application.model.DashboardFilters;
+import com.suaposta.analytics.application.model.PerformanceBreakdownFilters;
 import com.suaposta.analytics.application.port.out.AnalyticsBetRepository;
 import com.suaposta.messaging.contract.BetStatus;
 import java.sql.ResultSet;
@@ -56,6 +57,15 @@ public final class JdbcAnalyticsBetRepository implements AnalyticsBetRepository 
         parameters.add(BetStatus.CASHOUT.name());
         appendBankrollEvolutionFilters(sql, parameters, filters);
         sql.append(" order by settled_at asc, bet_id asc");
+        return jdbcTemplate.query(sql.toString(), JdbcAnalyticsBetRepository::mapRow, parameters.toArray());
+    }
+
+    @Override
+    public List<AnalyticsBet> findPerformanceBreakdownBets(UUID userId, PerformanceBreakdownFilters filters) {
+        var sql = new StringBuilder(SELECT_COLUMNS).append("where user_id = ?");
+        var parameters = new ArrayList<>();
+        parameters.add(userId);
+        appendPerformanceBreakdownFilters(sql, parameters, filters);
         return jdbcTemplate.query(sql.toString(), JdbcAnalyticsBetRepository::mapRow, parameters.toArray());
     }
 
@@ -153,6 +163,15 @@ public final class JdbcAnalyticsBetRepository implements AnalyticsBetRepository 
             parameters.add(filters.team());
             parameters.add(filters.team());
         }
+        append(sql, parameters, "market = ?", filters.market());
+    }
+
+    private static void appendPerformanceBreakdownFilters(
+            StringBuilder sql, List<Object> parameters, PerformanceBreakdownFilters filters) {
+        append(sql, parameters, "placed_at >= ?", offset(filters.startDate()));
+        append(sql, parameters, "placed_at <= ?", offset(filters.endDate()));
+        append(sql, parameters, "sport = ?", filters.sport());
+        append(sql, parameters, "league = ?", filters.league());
         append(sql, parameters, "market = ?", filters.market());
     }
 

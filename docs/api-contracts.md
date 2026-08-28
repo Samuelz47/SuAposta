@@ -915,6 +915,35 @@ WEEK
 DAY
 ```
 
+`groupBy` is required. Matching is case-sensitive and the value must be
+exactly one of the values above. Missing, blank, or invalid values return
+`400 Bad Request`. The server must not trim, normalize, case-fold, or otherwise
+reinterpret `groupBy`; `sport`, `Sport`, `" SPORT "`, and unknown values are
+invalid.
+
+Task 7.3 accepts only the five filters listed above. `team`, `status`,
+`minOdds`, `maxOdds`, `minStake`, and `maxStake` are not performance-breakdown
+filters.
+
+All supplied filters compose with the authenticated-user predicate and with
+each other using logical `AND`. Filters are applied before grouping and metric
+calculation.
+
+Date filters use `placedAt` and have inclusive boundaries:
+
+```text
+startDate: placedAt >= startDate
+endDate:   placedAt <= endDate
+```
+
+Values must be ISO-8601 instants. Offset-bearing values representing the same
+instant are equivalent. Malformed values return `400 Bad Request`, as does
+`startDate > endDate`. `settledAt` is not used for Task 7.3 date filtering.
+
+`sport`, `league`, and `market` use exact, case-sensitive matching. The server
+must not trim, normalize, or partially match these values. Blank values return
+`400 Bad Request`.
+
 Example:
 
 ```http
@@ -929,32 +958,126 @@ GET /analytics/performance/breakdown?groupBy=LEAGUE&sport=FOOTBALL
   "items": [
     {
       "name": "Brasileirão Série A",
-      "betsCount": 10,
       "totalStake": 500.00,
-      "totalProfit": 80.00,
+      "profit": 80.00,
       "roi": 16.00,
       "yield": 16.00,
-      "winRate": 60.00
+      "winRate": 60.00,
+      "avgOdds": 2.0500,
+      "drawdown": 40.00,
+      "betsCount": 10,
+      "pendingCount": 1,
+      "wonCount": 6,
+      "lostCount": 3,
+      "voidCount": 0,
+      "cashoutCount": 0,
+      "cancelledCount": 0
     },
     {
       "name": "Premier League",
-      "betsCount": 8,
       "totalStake": 400.00,
-      "totalProfit": -20.00,
+      "profit": -20.00,
       "roi": -5.00,
       "yield": -5.00,
-      "winRate": 37.50
+      "winRate": 37.50,
+      "avgOdds": 1.9500,
+      "drawdown": 20.00,
+      "betsCount": 8,
+      "pendingCount": 0,
+      "wonCount": 3,
+      "lostCount": 5,
+      "voidCount": 0,
+      "cashoutCount": 0,
+      "cancelledCount": 0
     }
   ]
 }
 ```
 
+The top-level response contains exactly `groupBy` and `items`. `groupBy` echoes
+the valid requested value. Every item contains exactly `name` plus these 14
+metrics, with no additional fields:
+
+```text
+totalStake
+profit
+roi
+yield
+winRate
+avgOdds
+drawdown
+betsCount
+pendingCount
+wonCount
+lostCount
+voidCount
+cashoutCount
+cancelledCount
+```
+
+`profit` is the projected profit aggregate; `avgOdds` is the unweighted
+arithmetic mean of projected odds; and `drawdown` is the absolute-money
+maximum drawdown from the Task 7.1 calculation, evaluated within that bucket's
+dataset. `totalReturn` is not part of this response.
+
+Each bucket reuses Task 7.1 metric eligibility and zero-denominator semantics:
+`WON`, `LOST`, and `CASHOUT` are eligible for financial, odds, and drawdown
+metrics; `winRate` uses `WON` over `WON + LOST`; `betsCount` includes every row;
+and the six status counts count their exact statuses, including `PENDING`,
+`VOID`, and `CANCELLED`. Metrics are calculated independently within each
+bucket after filtering. All decimal calculations use `BigDecimal`, the
+documented scale, and `HALF_UP` rounding.
+
+Grouping semantics are:
+
+- `SPORT`: `AnalyticsBet.sport`; `name` is `sport`.
+- `LEAGUE`: `AnalyticsBet.league`; `name` is `league`.
+- `MARKET`: `AnalyticsBet.market`; `name` is `market`.
+- `TEAM`: `homeTeam` and `awayTeam`; a bet contributes to each non-blank team
+  it contains, with duplicate contribution suppressed when both are equal.
+  `selection` never participates.
+- `DAY`: `placedAt` converted to UTC, formatted as `YYYY-MM-DD`.
+- `MONTH`: `placedAt` converted to UTC, formatted as `YYYY-MM`.
+- `WEEK`: `placedAt` converted to UTC, formatted as ISO week-based-year
+  `YYYY-Www`.
+
+Null or blank `SPORT`, `LEAGUE`, or `MARKET` values do not create buckets.
+Null or blank `homeTeam`/`awayTeam` values do not create a TEAM contribution.
+No synthetic `UNKNOWN`, `N/A`, `null`, or empty bucket is returned.
+
+`SPORT`, `LEAGUE`, `TEAM`, and `MARKET` items are ordered by `name ASC` using
+the persisted values. `DAY`, `WEEK`, and `MONTH` items are ordered
+chronologically ascending. Ordering must not depend on database or insertion
+order. TEAM bucket metrics are not globally additive because one bet may
+contribute to two TEAM buckets.
+
+When no data remains after authenticated-user ownership and filters, return:
+
+```json
+{
+  "groupBy": "LEAGUE",
+  "items": []
+}
+```
+
+Return only observed groups; do not generate zero-valued groups for absent
+dimensions.
+
 ### Rules
 
 - Requires authentication.
-- Must return only authenticated user data.
-- Must support grouping by common dashboard dimensions.
-- If `groupBy` is invalid, return `400 Bad Request`.
+- The trusted identity is `X-User-Id`. Missing or malformed UUID identity
+  returns `401 Unauthorized`.
+- Authentication and identity validation have precedence over filter and
+  `groupBy` validation; a request with both an invalid identity and an invalid
+  filter returns `401 Unauthorized`.
+- Must read exclusively from the authenticated user's `analytics_bets`
+  projections. It must not read the Betting DB, call Betting Service, use a
+  RabbitMQ read path, replay events, recalculate settlement, or use
+  pre-aggregated/materialized reporting data.
+- Must not accept ownership from query parameters or request bodies.
+- The filter, grouping, metric, ordering, null-value, empty-result, and
+  response-field rules above are normative.
 
 ---
 
