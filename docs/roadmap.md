@@ -98,7 +98,7 @@ The implementation agent must never run regular `git add`, `git add .`, `git add
 
 | Task | Specification | Status |
 | --- | --- | --- |
-| 8.1 Bootstrap Angular app, layout, and API boundary | `tasks/phase-08/01-angular-foundation.md` | PLANNED |
+| 8.1 Bootstrap Angular app, layout, and API boundary | `tasks/phase-08/01-angular-foundation.md` | QA IN REVIEW |
 | 8.2 Implement registration and login flow | `tasks/phase-08/02-auth-flow.md` | PLANNED |
 | 8.3 Implement betting and dashboard flows | `tasks/phase-08/03-betting-and-dashboard.md` | PLANNED |
 

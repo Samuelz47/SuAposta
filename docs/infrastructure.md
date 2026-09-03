@@ -37,6 +37,73 @@ The RabbitMQ variables configure the local broker:
 
 Inside a container, use `postgres`/`POSTGRES_PORT` for PostgreSQL and `rabbitmq`/`RABBITMQ_AMQP_PORT` for RabbitMQ. From the developer's machine, use `127.0.0.1` with the corresponding published host port. Do not use `localhost` for container-to-container communication.
 
+## Local application runtime contract
+
+The current Compose file provisions only PostgreSQL and RabbitMQ. It does not
+start application services, but the local application processes have a defined
+runtime contract. The Phase 8 frontend communicates directly from
+`http://localhost:4200` to the API Gateway at `http://localhost:8080` through
+Gateway CORS; there is no global API prefix and no Angular development proxy.
+
+The application values in `.env.example` are safe local placeholders. When
+launching a Spring process, provide only the variables for that process. In
+particular, do not export the Analytics `SPRING_DATASOURCE_*` values into the
+Auth or Betting process: those services also recognize the standard Spring
+datasource names and would otherwise use the Analytics datasource.
+
+### Shared JWT and Gateway configuration
+
+`JWT_SECRET` is required by both `auth-service` and `api-gateway`; it must have
+the same local value in both processes. It is the source for Auth token signing
+and the Gateway `gateway.jwt.secret` validation property. The value in
+`.env.example` is only a placeholder and must never be used in production.
+
+The Gateway has no global API prefix and listens on `http://localhost:8080` by
+default. Its downstream URLs are configurable with these actual property-backed
+environment variables (the shown values are the current defaults):
+
+| Gateway target | Environment variable | Default |
+| --- | --- | --- |
+| Auth service | `AUTH_SERVICE_URL` | `http://localhost:8081` |
+| Betting service | `BETTING_SERVICE_URL` | `http://localhost:8082` |
+| Analytics service | `ANALYTICS_SERVICE_URL` | `http://localhost:8083` |
+
+### Host-process datasource configuration
+
+For services running from the developer machine, use `127.0.0.1` and the
+published PostgreSQL port, not the Compose-network hostname `postgres`.
+
+| Service | Required local datasource variables | Example target |
+| --- | --- | --- |
+| Auth | `AUTH_DB_JDBC_URL`, `AUTH_DB_USER`, `AUTH_DB_PASSWORD` | `jdbc:postgresql://127.0.0.1:5432/suaposta_auth` |
+| Betting | `BETTING_DB_JDBC_URL`, `BETTING_DB_USER`, `BETTING_DB_PASSWORD` | `jdbc:postgresql://127.0.0.1:5432/suaposta_betting` |
+| Analytics | `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | `jdbc:postgresql://127.0.0.1:5432/suaposta_analytics` |
+
+The Auth and Betting services also support the standard Spring datasource
+properties, but the service-specific variable sets above avoid cross-service
+datasource collisions in a shared local environment. Analytics requires the
+standard Spring values shown in the table: its persistence configuration and
+controllers activate only when `spring.datasource.url`,
+`spring.datasource.username`, and `spring.datasource.password` are configured.
+
+### RabbitMQ configuration for application processes
+
+Betting publishes events and Analytics consumes them. For host-run application
+processes, Spring Boot maps the following environment names to the current
+`spring.rabbitmq.*` bindings:
+
+| Spring property | Environment variable | Local value |
+| --- | --- | --- |
+| `spring.rabbitmq.host` | `SPRING_RABBITMQ_HOST` | `127.0.0.1` |
+| `spring.rabbitmq.port` | `SPRING_RABBITMQ_PORT` | `5672` |
+| `spring.rabbitmq.username` | `SPRING_RABBITMQ_USERNAME` | `suaposta` |
+| `spring.rabbitmq.password` | `SPRING_RABBITMQ_PASSWORD` | local placeholder |
+
+Analytics activates its RabbitMQ listener only when both its datasource and
+`spring.rabbitmq.host` are configured. If a published host port differs from
+`5432` or `5672`, update the corresponding JDBC URL or Spring RabbitMQ port in
+the ignored local `.env` before launching the affected process.
+
 ## PostgreSQL Compose service
 
 The root `compose.yaml` uses the explicit `postgres:16.4-bookworm` image. PostgreSQL is attached to the shared `suaposta-network`, publishes only the local-development PostgreSQL port, and stores its data in the named `postgres-data` volume. No `container_name` is used.
@@ -250,7 +317,7 @@ Use `docker compose down -v` only when local data can be discarded or recreated.
 - The Compose file uses the current specification and no legacy `version` property.
 - Service and resource names are independent of the developer's computer.
 - `container_name` is intentionally not used; Compose manages container names within the project.
-- `.env.example` contains no production hostname, database URL, credential, or secret.
+- `.env.example` contains only local-development hostnames, URLs, and credential/secret placeholders; it contains no production value.
 - Task 1.2 provisions PostgreSQL and Task 1.3 provisions RabbitMQ; application services are added in later phases.
 - RabbitMQ application topology is intentionally not provisioned by Task 1.3.
 - No destructive Docker command is run automatically by the implementation or validation workflow.

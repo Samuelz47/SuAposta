@@ -66,7 +66,7 @@ GET /bets/{id}
 PUT /bets/{id}
 PATCH /bets/{id}/settle
 GET /analytics/dashboard
-GET /analytics/bets/performance
+GET /analytics/performance/breakdown
 ```
 
 ### JWT access token contract
@@ -97,6 +97,7 @@ X-User-Id: <authenticated-user-uuid>
 ```
 
 - The original `Authorization` header containing the Bearer JWT must be removed before forwarding the request downstream.
+- Any client-supplied `X-User-Id` header must be removed before the Gateway injects the trusted identity derived from the validated JWT.
 - JWT claims that are not part of the documented downstream identity contract must not be converted into internal headers.
 - Authentication at the Gateway establishes authenticated identity only.
 - Resource ownership and service-level authorization must be enforced by the responsible downstream service.
@@ -186,6 +187,22 @@ Validation error response:
 }
 ```
 
+Analytics invalid filters and invalid `groupBy` values use the standard error
+shape above and do not include `fieldErrors`:
+
+```json
+{
+  "timestamp": "2026-07-21T22:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Invalid request",
+  "path": "/analytics/performance/breakdown"
+}
+```
+
+This differs from Auth registration bean validation, whose `400` responses may
+use the validation error shape with `fieldErrors`.
+
 ---
 
 ## 3. Auth API
@@ -223,6 +240,9 @@ POST /auth/register
 400 Bad Request
 409 Conflict
 ```
+
+Registration bean-validation failures return `400 Bad Request` and may include
+`fieldErrors` using the validation error response shape.
 
 Conflict example:
 
@@ -274,6 +294,10 @@ POST /auth/login
 400 Bad Request
 401 Unauthorized
 ```
+
+Invalid credentials return `401 Unauthorized`. Missing, malformed, expired, or
+otherwise invalid JWTs on protected Gateway routes also return `401`, using the
+Gateway's safe generic error rather than a credential-validation response.
 
 ---
 
@@ -627,6 +651,7 @@ PATCH /bets/{id}/settle
   "returnAmount": 210.00,
   "placedAt": "2026-07-21T20:30:00Z",
   "settledAt": "2026-07-21T22:00:00Z",
+  "notes": "Home win based on recent form",
   "createdAt": "2026-07-21T21:00:00Z",
   "updatedAt": "2026-07-21T22:10:00Z"
 }
@@ -657,6 +682,7 @@ CANCELLED
 - For `CANCELLED`, profit is zero and return amount equals the stake.
 - For `CASHOUT`, `returnAmount` must be provided by the client and profit is calculated as `returnAmount - stake`.
 - The client must not provide or control `profit`.
+- A successful settlement returns the complete `BetResponse`, including `notes`.
 - Event publishing is outside the current Bet settlement contract. When event publishing is introduced in the event phase, a successfully persisted Bet settlement must publish `BET_SETTLED`.
 
 ### Possible errors
@@ -718,7 +744,7 @@ Text filters must be non-blank and are not trimmed, normalized, partially matche
 
 Odds filters use the domain odds scale (`4`, `HALF_UP`) and must normalize to a value strictly greater than `1.0000`. Stake filters use the money scale (`2`, `HALF_UP`) and must normalize to a value strictly greater than `0.00`. After normalization, each minimum must be less than or equal to its corresponding maximum.
 
-Malformed dates or decimals, blank text values, unsupported statuses, invalid ranges, and values outside those constraints return `400 Bad Request` using the standard validation error response.
+Malformed dates or decimals, blank text values, unsupported statuses, invalid ranges, and values outside those constraints return `400 Bad Request` using the Analytics standard error response. These responses do not include `fieldErrors`.
 
 Example:
 
@@ -869,7 +895,7 @@ market
 - `startDate` filters with `settledAt >= startDate`.
 - `endDate` filters with `settledAt <= endDate`.
 - `startDate` and `endDate` are inclusive and must be parsed as ISO-8601 instants. Offset-bearing values representing the same instant are equivalent.
-- Malformed date values return `400 Bad Request` using the standard validation error response.
+- Malformed date values return `400 Bad Request` using the Analytics standard error response, without `fieldErrors`.
 - When both date filters are supplied, `startDate` greater than `endDate` returns `400 Bad Request`.
 - Date and dimension filters are applied before status eligibility, ordering, and cumulative calculation. A filtered series starts its cumulative calculation at zero and must not include profit from excluded projections.
 - Dimension filters use the same exact matching semantics as the Analytics dashboard: `sport`, `league`, and `market` are exact case-sensitive matches; `team` matches exactly either `homeTeam` or `awayTeam`.
@@ -919,7 +945,8 @@ DAY
 exactly one of the values above. Missing, blank, or invalid values return
 `400 Bad Request`. The server must not trim, normalize, case-fold, or otherwise
 reinterpret `groupBy`; `sport`, `Sport`, `" SPORT "`, and unknown values are
-invalid.
+invalid. These `400` responses use the Analytics standard error shape and do
+not include `fieldErrors`.
 
 Task 7.3 accepts only the five filters listed above. `team`, `status`,
 `minOdds`, `maxOdds`, `minStake`, and `maxStake` are not performance-breakdown
@@ -938,11 +965,12 @@ endDate:   placedAt <= endDate
 
 Values must be ISO-8601 instants. Offset-bearing values representing the same
 instant are equivalent. Malformed values return `400 Bad Request`, as does
-`startDate > endDate`. `settledAt` is not used for Task 7.3 date filtering.
+`startDate > endDate`; these Analytics errors do not include `fieldErrors`.
+`settledAt` is not used for Task 7.3 date filtering.
 
 `sport`, `league`, and `market` use exact, case-sensitive matching. The server
 must not trim, normalize, or partially match these values. Blank values return
-`400 Bad Request`.
+`400 Bad Request` without `fieldErrors`.
 
 Example:
 
