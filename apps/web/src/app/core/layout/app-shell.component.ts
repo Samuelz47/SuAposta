@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
+import { AuthSessionService } from '../auth/auth-session.service';
 
 @Component({
   selector: 'app-shell',
@@ -8,4 +10,14 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss'
 })
-export class AppShellComponent {}
+export class AppShellComponent {
+  private readonly session = inject(AuthSessionService);
+  private readonly router = inject(Router);
+
+  readonly isAuthenticated = this.session.isAuthenticated;
+
+  logout(): void {
+    this.session.clear();
+    void this.router.navigateByUrl('/login');
+  }
+}

@@ -190,13 +190,13 @@ Apply `docs/definition-of-done.md`.
 
 | Field | Value |
 | --- | --- |
-| Status | `QA IN REVIEW` |
+| Status | `DONE` |
 | Red tests | Created `task81-routing.spec.ts`, `task81-shell.spec.ts`, and `task81-configuration.spec.ts`. The full Karma suite compiled and executed 17 tests, with 8 deterministic behavioral REDs and 9 GREEN baseline/configuration tests in both runs. |
 | Strict TypeScript coverage | `strictNullChecks` is protected by the compile-time test sentinel; effective `strict=true` is verified by `@angular/compiler-cli` configuration evidence and the production build. |
 | Human test approval | Approved by human on 2026-09-03. |
 | Implementation | Complete: approved bootstrap-fixture correction applied, two final frontend runs GREEN (26/26 each), production build GREEN. |
 | Human implementation approval | APPROVED on 2026-09-03: human approved the proposed fixture correction and requested completion for final QA. |
-| Final QA | `PENDING` |
+| Final QA | `APPROVED`; independent QA completed and the human approved the outcome on 2026-09-14. |
 | Evidence | Baseline `npm ci`, Angular baseline test (`1 SUCCESS`), production build, and `npm start` on `http://localhost:4200` passed before the new specs. `./gradlew :services:api-gateway:test --rerun-tasks` passed. Effective Angular compiler configuration resolved with `@angular/compiler-cli`: `strict=true`, `strictTemplates=true`, no errors. |
 | Original blind RED run 1 | `npm test -- --watch=false --browsers=ChromeHeadless`: 17 total, 9 GREEN, 8 RED. REDs: four structural routes (`/login`, `/register`, `/dashboard`, `/bets`) failed with `NG04002`; root redirect remained `/`; wildcard navigation failed with `NG04002`; the lazy-boundary test failed at its first real navigation because `/login` was absent; shell had no navigation or `router-outlet`. |
 | Original blind RED run 2 | `npm test -- --watch=false --browsers=ChromeHeadless`: 17 total, 9 GREEN, 8 RED, with the same failing behaviors. |
@@ -220,18 +220,32 @@ correction to the two bootstrap fixtures and the implementation handoff to QA.
 - Affected acceptance criteria: standalone Angular structure and the minimal
   navigation/routed-content shell. Their behavior and all assertions remain
   unchanged. No test is removed, skipped, weakened, or mocked.
-- The routing and shell protected test files remain unchanged. Any further
-  protected-test change still requires explicit human approval.
+- At Task 8.1 finalization, the routing and shell protected test files remained
+  unchanged. A later Task 8.2 compatibility update to the routing expectations
+  is recorded below and was separately authorized by the human.
 
 The approved correction passed both complete frontend runs. Assertions and test
 bodies were compared to the approved originals: only the stated import/provider
 additions and formatting of that setup changed.
 
+#### Task 8.2 compatibility update — 2026-09-17
+
+The human authorized updating `apps/web/src/app/task81-routing.spec.ts` after
+the Task 8.2 implementation exposed an objective contract conflict. Task 8.2
+defines `/dashboard` and `/bets` as protected routes, so unauthenticated
+navigation must end at `/login`; the root and unknown-route redirects also end
+at `/login` when no session exists. The routing test now records those expected
+outcomes while preserving its lazy-loading and routed-content assertions.
+
+This was an explicit human-approved change to a previously protected test. No
+Task 8.2 test was weakened or changed, and no production exception was added to
+make the two route contracts appear compatible.
+
 ### Implementation gate — 2026-09-03
 
 | Current status | Pending gate |
 | --- | --- |
-| QA IN REVIEW | Independent QA audit and human approval of its outcome. |
+| DONE | None. |
 
 | Gate | Decision / evidence | Date / approver |
 | --- | --- | --- |
@@ -240,14 +254,15 @@ additions and formatting of that setup changed.
 | Tests approved | APPROVED; explicit human instruction in this implementation session confirms the bootstrap and blind RED tests are approved. | 2026-09-03 / human |
 | Implementation in Green | Two final runs: 26/26 GREEN each; clean install and production build passed. Earlier 24 GREEN / 2 RED fixture failures were resolved only after the approval recorded above. | 2026-09-03 / implementation agent |
 | Human diff review | APPROVED: "aprovado bb, finalize sua etapa pra eu mandar pro agente qa final"; production diff and the proposed fixture correction approved for handoff. | 2026-09-03 / human |
-| QA verdict | PENDING; human will hand off to the independent QA agent. | — |
+| QA verdict | APPROVED; independent final QA completed and human approved the outcome. | 2026-09-14 / human |
 
 Transitions: `TESTS IN REVIEW` -> `IMPLEMENTATION IN PROGRESS` was recorded before
 functional production changes. After the subsequent human approval and final
 GREEN verification, `IMPLEMENTATION IN PROGRESS` -> `QA IN REVIEW` was recorded
-and synchronized with the roadmap. The initial instruction to await human diff
-approval has therefore been satisfied. `DONE`, commits, push, and merge remain
-outside this implementation handoff.
+and synchronized with the roadmap. The final QA audit returned `APPROVED`, and
+the human approved that outcome on 2026-09-14, completing the `QA IN REVIEW` ->
+`DONE` transition. The task had already been merged before final QA; this is
+recorded as the workflow deviation below.
 
 Pre-implementation REDs are the four absent structural routes, root and wildcard
 redirects, lazy routing, and navigation/outlet shell. The first sandboxed run
@@ -366,13 +381,15 @@ confirmed production, dependencies, backend, and runtime configuration unchanged
 
 #### Scope and integrity
 
-- Protected tests modified: YES, only the human-authorized bootstrap setup in
-  `task81-configuration.spec.ts`. The scaffold setup received the same approved
-  correction. No assertion, scenario, test count, or compile-time sentinel changed.
+- Protected tests modified: YES. The original Task 8.1 finalization included
+  only the human-authorized bootstrap setup in `task81-configuration.spec.ts`
+  and the scaffold setup. On 2026-09-17, the human separately authorized the
+  routing expectation update documented above so Task 8.1 reflects Task 8.2's
+  protected-route contract.
 - SHA-256 evidence:
   - configuration before approval: `c18600fce4d8d48ec2dd9a439593792802cd7a3e0364605e658625fb4ce328c1`;
   - configuration after authorized correction: `e03c9559e830ecd61f503b0a711fb9c534c0647846fff83c59b9ada3922fac17`;
-  - routing unchanged: `93d80fb1cbe4598892b429f8ac49b120221f50780e95e21df760dc65198084cf`;
+  - routing at Task 8.1 finalization: `93d80fb1cbe4598892b429f8ac49b120221f50780e95e21df760dc65198084cf`; the later compatibility update is documented above;
   - shell unchanged: `1858e4fd7c827f82b6d2721e821fd06ecafba5a462329c53b5645ea4332f5d3f`.
 - No new dependencies, package/configuration changes, SSR/SSG, global store,
   Angular proxy, guards, forms, session logic, or business API services.
@@ -390,9 +407,48 @@ confirmed production, dependencies, backend, and runtime configuration unchanged
 
 ### QA report
 
-PENDING. Human test and implementation approvals are recorded above. The final
-QA agent must independently audit the original criteria, source, complete diff,
-protected tests (including the explicitly approved fixture correction),
-supporting tests, and evidence using `docs/definition-of-done.md`. It must account
-for the documented infrastructure-blocked root check and the existing npm audit
-findings. No QA verdict or `DONE` transition is issued by this implementation agent.
+VERDICT: APPROVED
+
+Blockers:
+
+- None.
+
+Important issues:
+
+- The root `./gradlew check --rerun-tasks` was `INFRASTRUCTURE BLOCKED` because
+  Docker/PostgreSQL was unavailable; 125 tests completed with 17 integration
+  initializations failing for that external reason. No Task 8.1 functional
+  regression was identified.
+
+Non-blocking improvements:
+
+- `npm audit` reported 57 vulnerabilities in the complete dependency graph;
+  the production-only audit reported 8 vulnerabilities (5 moderate, 3 high)
+  and no critical production-runtime finding. No dependency changes were made.
+
+Workflow deviation:
+
+- FINAL QA EXECUTED POST-MERGE. The checkout was `feature/web-auth`, while
+  `HEAD`, `main`, and `origin/main` all referenced the same Task 8.1 commit.
+
+Evidence:
+
+- Independent audit of the required architecture, API, workflow, testing,
+  infrastructure, roadmap, and Phase 8 task documents.
+- `npm ci` passed; frontend tests passed twice with 26/26 tests and no skips;
+  `npm run build` passed; `npm start` served `http://localhost:4200` and
+  returned HTTP 200.
+- `./gradlew :services:api-gateway:test --rerun-tasks` passed with 44 tests.
+- Effective Angular configuration resolved to `strict=true` and
+  `strictTemplates=true`; Angular 18, standalone bootstrap, SCSS, npm,
+  centralized Gateway configuration, lazy routes, redirects, shell, and
+  direct-target protection were verified.
+- Protected Task81 tests and supporting Gateway-boundary tests were audited;
+  no direct internal-service target, `X-User-Id`, Authorization/JWT, proxy,
+  SSR/SSG, or prohibited state-management behavior was found.
+- Backend production and migration diffs attributable to Task 8.1 were absent;
+  `git diff --check` passed and the index was empty.
+
+Human QA approval:
+
+- Approved by human on 2026-09-14.

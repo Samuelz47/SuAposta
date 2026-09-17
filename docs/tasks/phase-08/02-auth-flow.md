@@ -403,4 +403,107 @@ Apply `docs/definition-of-done.md`.
 
 ## Status and evidence
 
-Use the status table from `docs/tasks/TEMPLATE.md`.
+| Field | Value |
+| --- | --- |
+| Status | `DONE` |
+| Red tests | Initial implementation baseline created 24 Task 8.2 behavioral cases in `task82-auth-forms.spec.ts`, `task82-session-routing.spec.ts`, and `task82-auth-http.spec.ts`; the pre-implementation suite had 50 cases with 28 GREEN and 22 deterministic behavioral RED cases. |
+| Human test approval | `APPROVED` by human on 2026-09-16. |
+| Protected Task81 tests modified | `YES`, with explicit human authorization on 2026-09-17 to update `task81-routing.spec.ts` for the now-protected dashboard and bets routes. |
+| Task81 regression | GREEN: all 26 Task 8.1 baseline/supporting cases passed in the final complete run; the isolated routing, shell, and configuration selection passed 16/16 after the authorized compatibility update. |
+| Frontend baseline | `npm ci` passed; pre-Task82 frontend test baseline passed with 26/26; `npm run build` passed. |
+| Gateway regression | `./gradlew :services:api-gateway:test --rerun-tasks` passed. |
+| Auth backend baseline | `INFRASTRUCTURE BLOCKED`: 12 tests completed, 8 passed, and 4 integration initializations failed because PostgreSQL at `127.0.0.1:5432` was unavailable. |
+| Human implementation/diff approval | `APPROVED` by human on 2026-09-17, including the protected-test compatibility decision; implementation is ready for independent QA. |
+| Intent-to-add | Only `git add -N` is used for new Task 8.2 production files and supporting specs before QA; no regular staging, commit, push, or merge. |
+| Production changes | Added centralized auth API/session models, strict local JWT format validation, Gateway interceptor, route guards, login/register forms, controlled safe errors, and logout actions. No backend, migration, package, or Task 8.3 changes. |
+
+### Task 8.2 test evidence
+
+| Area | Coverage / result |
+| --- | --- |
+| Forms | Login and registration semantic fields, absence of password confirmation, required-field no-submit behavior, loading and duplicate-submit protection — GREEN. |
+| Requests | Exact Gateway `POST /auth/login` and `POST /auth/register` targets and exact request fields; public auth requests assert no `Authorization` or client `X-User-Id` — GREEN. |
+| Success/failure | Login persistence/redirect/password secrecy, registration `201` redirect without session, login `401` no-loop, registration `400`/`409`, and safe error feedback — GREEN. |
+| Session/routing | Missing-session guards, malformed/expired token invalidation, valid-session protected navigation, authenticated public-route redirects, storage restoration, and logout — GREEN. |
+| HTTP boundary | No-session requests remain free of identity headers; authenticated bearer propagation, `X-User-Id` absence, and authenticated `401` invalidation — GREEN. |
+
+### Verification commands
+
+| Verification | Result |
+| --- | --- |
+| Baseline install | `npm ci` — PASS. |
+| Baseline frontend test | `npm test -- --watch=false --browsers=ChromeHeadless` — 26/26 GREEN before Task 8.2 tests. The initial sandbox attempt could not bind Karma port 9876; the same command succeeded with the required local-runner permission. |
+| Baseline production build | `npm run build` — PASS with the required local-runner permission; the initial sandbox attempt exited 134 before producing a build result. |
+| Task 8.2 run 1 | `npm test -- --watch=false --browsers=ChromeHeadless` — 50 total, 28 GREEN, 22 RED. |
+| Task 8.2 run 2 | Same command — 50 total, 28 GREEN, 22 RED. |
+| RED determinism | PASS: the same 22 Task 8.2 behavioral failures occurred in both runs; no compile/load failure occurred. |
+| Pre-correction frontend test | `npm test -- --watch=false --browsers=ChromeHeadless` — 50/50 GREEN before final QA identified the two blockers. |
+| Pre-correction production build | `npm run build` — PASS. |
+| Pre-correction local serve sanity | `npm start` — PASS at `http://localhost:4200`; `curl --fail` returned HTTP 200. |
+| Correction frontend run 1 | `npm test -- --watch=false --browsers=ChromeHeadless` — 61/61 GREEN. |
+| Correction frontend run 2 | Same command — 61/61 GREEN. |
+| Correction production build | `npm run build` — PASS. |
+| Correction local serve sanity | `npm start` — PASS at `http://localhost:4200`; `curl --fail` returned HTTP 200. |
+| Correction Gateway regression | `./gradlew :services:api-gateway:test --rerun-tasks` — BUILD SUCCESSFUL. |
+| Correction Auth regression | `INFRASTRUCTURE BLOCKED`: 12 tests completed; 4 integration initializations failed because PostgreSQL at `127.0.0.1:5432` was unavailable, while the remaining tests passed. |
+| Correction root regression | `INFRASTRUCTURE BLOCKED`: 17 integration initializations failed — 6 Analytics Testcontainers, 4 Auth PostgreSQL, and 7 Betting PostgreSQL/RabbitMQ — because Docker/PostgreSQL were unavailable; unaffected tests compiled and ran. |
+| Diff checks | `git diff --check` — PASS; only intent-to-add is permitted before QA, with no regular staging. |
+
+### Deferred assertions
+
+- Exact private `localStorage` key ownership/source scanning is deferred because the contract intentionally does not freeze a key or service/class name; successful-login tests discover the created entry behaviorally.
+- A source-text scan for internal service URLs is deferred; the public Gateway request contract and the protected Task 8.1 Gateway boundary tests cover the available stable surface without scanning tests, documentation, dependencies, or generated output.
+
+### Approved-test changes
+
+On 2026-09-17 the human authorized the compatibility update in
+`apps/web/src/app/task81-routing.spec.ts`. The protected Task 8.1 assertions
+previously expected unauthenticated `/dashboard` and `/bets` navigation to
+remain on those URLs, while the approved Task 8.2 contract requires both to
+redirect to `/login`. The root and unknown-route expectations were updated for
+the same protected dashboard entry behavior. No Task 8.2 test was changed,
+weakened, skipped, or removed.
+
+### Initial QA report before remediation
+
+The initial final QA identified two blockers: malformed JWT header/signature
+Base64URL validation and blacklist-based authentication-error sanitization.
+The task remained `QA IN REVIEW` pending remediation and a final independent
+rerun.
+
+### QA correction after rejected final QA — 2026-09-17
+
+The final QA blockers were corrected without changing the backend or protected
+tests:
+
+- Blocker 1: `AuthSessionService` now validates Base64URL syntax and decoding
+  for all three JWT segments, parses header and payload as JSON objects, and
+  checks finite future `exp`; it performs no cryptographic verification.
+- Blocker 2: authentication errors now use controlled frontend messages mapped
+  by context and HTTP status. Arbitrary backend error messages are never
+  rendered, including infrastructure details such as `SQLSTATE ... db.internal`.
+- Supporting tests were added for malformed JWT headers/payloads/signatures,
+  invalid or expired `exp`, valid synthetic JWTs, and safe error mappings.
+- `LogoutButtonComponent` was confirmed live and remains referenced by the
+  dashboard and bets pages; no dead-code cleanup was necessary.
+- Route inspection confirms `login`, `register`, `dashboard`, and `bets` remain
+  lazy through `loadComponent`.
+
+The task is ready for QA to re-run. The only remaining verification limitation
+is infrastructure availability for PostgreSQL and Docker-backed Gradle tests.
+
+### Final QA verdict — 2026-09-17
+
+Independent final QA was re-run after both remediation blockers were corrected.
+The frontend suite passed 61/61 twice, the production build passed, the local
+server returned HTTP 200, and the Gateway regression passed. The malformed JWT
+Base64URL cases and controlled authentication-error mapping cases passed
+explicitly. Auth and root Gradle integration coverage remained blocked only by
+the unavailable Docker/PostgreSQL environment; no Task 8.2 assertion failure
+was observed.
+
+Final verdict: `APPROVED`.
+
+The human approved the final QA outcome on 2026-09-17. The controlled roadmap
+transition from `QA IN REVIEW` to `DONE` is therefore complete. QA made no
+production or test-code changes.

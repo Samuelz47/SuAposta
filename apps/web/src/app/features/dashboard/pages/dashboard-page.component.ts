@@ -1,8 +1,14 @@
 import { Component } from '@angular/core';
 
+import { LogoutButtonComponent } from '../../../core/auth/logout-button.component';
+
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
-  template: '<h1>Dashboard</h1>'
+  imports: [LogoutButtonComponent],
+  template: `
+    <h1>Dashboard</h1>
+    <app-logout-button />
+  `
 })
 export class DashboardPageComponent {}

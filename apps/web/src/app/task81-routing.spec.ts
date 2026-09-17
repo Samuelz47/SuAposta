@@ -5,10 +5,10 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { appConfig } from './app.config';
 
 const structuralRoutes = [
-  { url: '/login', path: 'login' },
-  { url: '/register', path: 'register' },
-  { url: '/dashboard', path: 'dashboard' },
-  { url: '/bets', path: 'bets' },
+  { url: '/login', path: 'login', expectedUrl: '/login' },
+  { url: '/register', path: 'register', expectedUrl: '/register' },
+  { url: '/dashboard', path: 'dashboard', expectedUrl: '/login' },
+  { url: '/bets', path: 'bets', expectedUrl: '/login' },
 ];
 
 function configureApplicationRouter(): void {
@@ -60,28 +60,28 @@ describe('Task 8.1 structural routes', () => {
 
       await harness.navigateByUrl(route.url);
 
-      expect(TestBed.inject(Router).url).toBe(route.url);
+      expect(TestBed.inject(Router).url).toBe(route.expectedUrl);
       expect(harness.routeNativeElement).not.toBeNull();
     });
   }
 
-  it('should redirect the root URL to the dashboard through Angular Router', async () => {
+  it('should redirect the root URL through the protected dashboard entry', async () => {
     configureApplicationRouter();
     const harness = await RouterTestingHarness.create();
 
     await harness.navigateByUrl('/');
 
-    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(TestBed.inject(Router).url).toBe('/login');
     expect(harness.routeNativeElement).not.toBeNull();
   });
 
-  it('should redirect an unknown URL to the dashboard through Angular Router', async () => {
+  it('should redirect an unknown URL through the protected dashboard entry', async () => {
     configureApplicationRouter();
     const harness = await RouterTestingHarness.create();
 
     await harness.navigateByUrl('/route-that-does-not-exist');
 
-    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(TestBed.inject(Router).url).toBe('/login');
     expect(harness.routeNativeElement).not.toBeNull();
   });
 
