@@ -2,10 +2,13 @@ package com.suaposta.betting.presentation.exception;
 
 import com.suaposta.betting.application.exception.BetNotFoundException;
 import com.suaposta.betting.presentation.dto.ApiErrorResponse;
+import com.suaposta.betting.presentation.dto.FieldErrorResponse;
+import com.suaposta.betting.presentation.dto.ValidationErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,6 +17,25 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 
 @RestControllerAdvice
 public class BetExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ValidationErrorResponse> handleValidation(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+        var fieldErrors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldErrorResponse(
+                        error.getField(),
+                        error.getDefaultMessage() == null ? "is invalid" : error.getDefaultMessage()))
+                .toList();
+        var response = new ValidationErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Error",
+                "Invalid request fields",
+                request.getRequestURI(),
+                fieldErrors);
+        return ResponseEntity.badRequest().body(response);
+    }
 
     @ExceptionHandler(UnauthorizedIdentityException.class)
     public ResponseEntity<ApiErrorResponse> handleUnauthorized(HttpServletRequest request) {

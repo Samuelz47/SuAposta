@@ -19,6 +19,7 @@ import com.suaposta.betting.presentation.mapper.BetApiMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import jakarta.validation.Valid;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,7 +62,7 @@ public class BetController {
     @ResponseStatus(HttpStatus.CREATED)
     public BetResponse create(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
-            @RequestBody CreateBetRequest request) {
+            @Valid @RequestBody CreateBetRequest request) {
         var bet = createBetService.create(authenticatedUserId(userIdHeader), BetApiMapper.toCommand(request));
         return BetApiMapper.toResponse(bet);
     }
